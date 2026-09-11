@@ -38,6 +38,7 @@ from .reprocapsule import (
     ReproCapsuleError,
     build_capsule,
     dumps as dump_reprocapsule,
+    replay_capsule,
     render_text as render_reprocapsule,
 )
 from .skilldiff_v03 import compare, dumps as dump_skilldiff, dumps_sarif, render_text as render_skilldiff
@@ -78,97 +79,60 @@ def build_parser() -> argparse.ArgumentParser:
     )
     benchmark_cmd.add_argument("--dataset", required=True, help="Path to a DataLease classifier JSONL dataset")
     benchmark_cmd.add_argument("--json", action="store_true", dest="as_json")
-    benchmark_cmd.add_argument(
-        "--min-precision",
-        type=float,
-        default=None,
-        help="Exit 5 when micro precision is below this threshold",
-    )
-    benchmark_cmd.add_argument(
-        "--min-recall",
-        type=float,
-        default=None,
-        help="Exit 5 when micro recall is below this threshold",
-    )
+    benchmark_cmd.add_argument("--min-precision", type=float, default=None)
+    benchmark_cmd.add_argument("--min-recall", type=float, default=None)
 
     freshplan = sub.add_parser("freshplan", help="Evaluate and refresh freshness-aware dependency graphs")
     freshplan_sub = freshplan.add_subparsers(dest="freshplan_command", required=True)
 
-    freshplan_check = freshplan_sub.add_parser(
-        "check",
-        help="Find stale facts and selectively invalidate dependent plan nodes",
-    )
-    freshplan_check.add_argument("--plan", required=True, help="Path to a FreshPlan JSON/YAML document")
-    freshplan_check.add_argument(
-        "--as-of",
-        default=None,
-        help="ISO-8601 evaluation time; defaults to current UTC time",
-    )
+    freshplan_check = freshplan_sub.add_parser("check", help="Find stale facts and selectively invalidate dependent plan nodes")
+    freshplan_check.add_argument("--plan", required=True)
+    freshplan_check.add_argument("--as-of", default=None)
     freshplan_check.add_argument("--json", action="store_true", dest="as_json")
-    freshplan_check.add_argument(
-        "--fail-on-stale",
-        action="store_true",
-        help="Exit 6 when stale facts invalidate one or more plan nodes",
-    )
+    freshplan_check.add_argument("--fail-on-stale", action="store_true")
 
-    freshplan_requests = freshplan_sub.add_parser(
-        "requests",
-        help="Emit value-free refresh requests for stale or refresh-due facts",
-    )
-    freshplan_requests.add_argument("--plan", required=True, help="Path to a FreshPlan JSON/YAML document")
-    freshplan_requests.add_argument("--as-of", default=None, help="ISO-8601 evaluation time")
+    freshplan_requests = freshplan_sub.add_parser("requests", help="Emit value-free refresh requests")
+    freshplan_requests.add_argument("--plan", required=True)
+    freshplan_requests.add_argument("--as-of", default=None)
     freshplan_requests.add_argument("--json", action="store_true", dest="as_json")
 
-    freshplan_patch = freshplan_sub.add_parser(
-        "patch",
-        help="Apply replacement evidence metadata and emit the minimal control-plane plan patch",
-    )
-    freshplan_patch.add_argument("--plan", required=True, help="Path to a FreshPlan JSON/YAML document")
-    freshplan_patch.add_argument(
-        "--evidence",
-        required=True,
-        help="Path to FreshPlan replacement evidence JSON/YAML",
-    )
-    freshplan_patch.add_argument("--as-of", default=None, help="ISO-8601 evaluation time")
+    freshplan_patch = freshplan_sub.add_parser("patch", help="Apply replacement evidence and emit a minimal plan patch")
+    freshplan_patch.add_argument("--plan", required=True)
+    freshplan_patch.add_argument("--evidence", required=True)
+    freshplan_patch.add_argument("--as-of", default=None)
     freshplan_patch.add_argument("--json", action="store_true", dest="as_json")
-    freshplan_patch.add_argument(
-        "--fail-on-replan",
-        action="store_true",
-        help="Exit 6 when the patch is blocked or requires re-planning",
-    )
+    freshplan_patch.add_argument("--fail-on-replan", action="store_true")
 
-    freshplan_bench = freshplan_sub.add_parser(
-        "benchmark",
-        help="Benchmark deterministic FreshPlan evaluation on generated large graphs",
-    )
-    freshplan_bench.add_argument(
-        "--nodes",
-        nargs="+",
-        type=int,
-        default=[1000, 5000, 10000],
-        help="One or more generated graph node counts",
-    )
+    freshplan_bench = freshplan_sub.add_parser("benchmark", help="Benchmark deterministic FreshPlan evaluation")
+    freshplan_bench.add_argument("--nodes", nargs="+", type=int, default=[1000, 5000, 10000])
     freshplan_bench.add_argument("--repeats", type=int, default=3)
     freshplan_bench.add_argument("--json", action="store_true", dest="as_json")
-    freshplan_bench.add_argument(
-        "--max-median-ms",
-        type=float,
-        default=None,
-        help="Exit 6 when the largest generated case exceeds this median runtime",
-    )
+    freshplan_bench.add_argument("--max-median-ms", type=float, default=None)
 
-    reprocapsule = sub.add_parser(
-        "reprocapsule",
-        help="Package a failure into a portable, sanitized reproduction capsule",
-    )
+    reprocapsule = sub.add_parser("reprocapsule", help="Build and verify portable failure reproductions")
     reprocapsule_sub = reprocapsule.add_subparsers(dest="reprocapsule_command", required=True)
-    reprocapsule_build = reprocapsule_sub.add_parser(
-        "build",
-        help="Build a reproduction capsule without executing the failing command",
-    )
-    reprocapsule_build.add_argument("--spec", required=True, help="Path to ReproCapsule JSON/YAML build spec")
-    reprocapsule_build.add_argument("--output", required=True, help="Directory to write the capsule")
+    reprocapsule_build = reprocapsule_sub.add_parser("build", help="Build a capsule without executing its command")
+    reprocapsule_build.add_argument("--spec", required=True)
+    reprocapsule_build.add_argument("--output", required=True)
     reprocapsule_build.add_argument("--json", action="store_true", dest="as_json")
+
+    reprocapsule_replay = reprocapsule_sub.add_parser(
+        "replay",
+        help="Verify capsule integrity and optionally execute its declared command",
+    )
+    reprocapsule_replay.add_argument("--capsule", required=True, help="Path to a built capsule directory")
+    reprocapsule_replay.add_argument(
+        "--execute",
+        action="store_true",
+        help="Explicitly execute the capsule command after integrity checks",
+    )
+    reprocapsule_replay.add_argument("--timeout", type=float, default=30.0, help="Replay timeout in seconds, max 300")
+    reprocapsule_replay.add_argument("--json", action="store_true", dest="as_json")
+    reprocapsule_replay.add_argument(
+        "--fail-on-divergence",
+        action="store_true",
+        help="Exit 7 unless replay reproduces the declared failure",
+    )
 
     return parser
 
@@ -204,12 +168,10 @@ def main(argv: list[str] | None = None) -> int:
         except (DataLeaseError, OSError) as exc:
             print(f"DataLease error: {exc}", file=sys.stderr)
             return 4
-
         if args.audit_output:
             audit_path = Path(args.audit_output)
             audit_path.parent.mkdir(parents=True, exist_ok=True)
             audit_path.write_text(dump_datalease(report) + "\n", encoding="utf-8")
-
         if args.payload_only and report["decision"] == "projected":
             print(json.dumps(report["output"], indent=2, sort_keys=True))
         else:
@@ -220,19 +182,14 @@ def main(argv: list[str] | None = None) -> int:
         for name in ("min_precision", "min_recall"):
             threshold = getattr(args, name)
             if threshold is not None and not 0.0 <= threshold <= 1.0:
-                print(
-                    f"DataLease benchmark error: --{name.replace('_', '-')} must be between 0 and 1",
-                    file=sys.stderr,
-                )
+                print(f"DataLease benchmark error: --{name.replace('_', '-')} must be between 0 and 1", file=sys.stderr)
                 return 5
         try:
             report = benchmark_datalease(args.dataset)
         except (DataLeaseBenchmarkError, DataLeaseError, OSError) as exc:
             print(f"DataLease benchmark error: {exc}", file=sys.stderr)
             return 5
-
         print(dump_benchmark(report) if args.as_json else render_benchmark(report))
-
         micro = report["micro"]
         if args.min_precision is not None and micro["precision"] < args.min_precision:
             return 5
@@ -246,7 +203,6 @@ def main(argv: list[str] | None = None) -> int:
         except (FreshPlanError, OSError, json.JSONDecodeError) as exc:
             print(f"FreshPlan error: {exc}", file=sys.stderr)
             return 6
-
         print(dump_freshplan(report) if args.as_json else render_freshplan(report))
         if args.fail_on_stale and report["decision"] == "replan_required":
             return 6
@@ -258,7 +214,6 @@ def main(argv: list[str] | None = None) -> int:
         except (FreshPlanRefreshError, FreshPlanError, OSError, json.JSONDecodeError) as exc:
             print(f"FreshPlan refresh error: {exc}", file=sys.stderr)
             return 6
-
         print(dump_freshplan_refresh(report) if args.as_json else render_requests_text(report))
         return 0
 
@@ -268,7 +223,6 @@ def main(argv: list[str] | None = None) -> int:
         except (FreshPlanRefreshError, FreshPlanError, OSError, json.JSONDecodeError) as exc:
             print(f"FreshPlan refresh error: {exc}", file=sys.stderr)
             return 6
-
         print(dump_freshplan_refresh(report) if args.as_json else render_patch_text(report))
         if args.fail_on_replan and report["decision"] in {"blocked", "replan_required"}:
             return 6
@@ -283,16 +237,8 @@ def main(argv: list[str] | None = None) -> int:
         except (FreshPlanBenchmarkError, FreshPlanError) as exc:
             print(f"FreshPlan benchmark error: {exc}", file=sys.stderr)
             return 6
-
-        print(
-            dump_freshplan_benchmark(report)
-            if args.as_json
-            else render_freshplan_benchmark(report)
-        )
-        if (
-            args.max_median_ms is not None
-            and report["largest_case"]["median_ms"] > args.max_median_ms
-        ):
+        print(dump_freshplan_benchmark(report) if args.as_json else render_freshplan_benchmark(report))
+        if args.max_median_ms is not None and report["largest_case"]["median_ms"] > args.max_median_ms:
             return 6
         return 0
 
@@ -304,6 +250,17 @@ def main(argv: list[str] | None = None) -> int:
             return 7
         print(dump_reprocapsule(report) if args.as_json else render_reprocapsule(report))
         return 0
+
+    if args.command == "reprocapsule" and args.reprocapsule_command == "replay":
+        try:
+            report = replay_capsule(args.capsule, execute=args.execute, timeout_seconds=args.timeout)
+        except (ReproCapsuleError, OSError) as exc:
+            print(f"ReproCapsule replay error: {exc}", file=sys.stderr)
+            return 7
+        print(dump_reprocapsule(report) if args.as_json else render_reprocapsule(report))
+        if args.fail_on_divergence and report["decision"] != "reproduced":
+            return 7
+        return 0 if report["decision"] not in {"blocked", "diverged"} else 7
 
     return 1
 
