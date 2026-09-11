@@ -29,6 +29,7 @@ def main() -> int:
     python = sys.executable
 
     run(python, "-m", "unittest", "discover", "-s", "tests", "-v")
+
     run(
         python,
         "-m",
@@ -37,6 +38,38 @@ def main() -> int:
         "examples/refactor-contract.json",
         "--evidence",
         "examples/refactor-evidence.json",
+    )
+
+    partial = subprocess.run(
+        [
+            python,
+            "-m",
+            "trustforge.cli",
+            "verify",
+            "examples/commitmentguard/release-contract.json",
+            "--evidence",
+            "examples/commitmentguard/release-evidence.json",
+            "--json",
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    if partial.returncode != 3:
+        raise RuntimeError(f"CommitmentGuard strict partial gate expected exit 3, got {partial.returncode}")
+    partial_report = json.loads(partial.stdout)
+    if partial_report["completion_state"] != "partial" or not partial_report["required_satisfied"]:
+        raise RuntimeError("CommitmentGuard partial example did not preserve required-satisfied semantics")
+
+    run(
+        python,
+        "-m",
+        "trustforge.cli",
+        "verify",
+        "examples/commitmentguard/release-contract.json",
+        "--evidence",
+        "examples/commitmentguard/release-evidence.json",
+        "--accept-partial",
     )
 
     run(
