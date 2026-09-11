@@ -21,12 +21,7 @@ class FakeDocker:
         if command[:2] == ["docker", "build"]:
             return subprocess.CompletedProcess(command, 0, stdout="built", stderr="")
         if command[:2] == ["docker", "run"]:
-            return subprocess.CompletedProcess(
-                command,
-                self.run_return_code,
-                stdout="",
-                stderr=self.run_stderr,
-            )
+            return subprocess.CompletedProcess(command, self.run_return_code, stdout="", stderr=self.run_stderr)
         if command[:3] == ["docker", "image", "rm"]:
             return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
         raise AssertionError(f"unexpected command: {command}")
@@ -59,7 +54,7 @@ class ReproCapsuleContainerTests(unittest.TestCase):
             self.assertFalse(report["container_built"])
             self.assertEqual(fake.calls, [])
 
-    def test_execute_uses_hardened_runtime_flags_and_reproduces(self):
+    def test_execute_uses_hardened_build_and_runtime_flags_and_reproduces(self):
         with tempfile.TemporaryDirectory() as tmp:
             capsule = self._capsule(Path(tmp))
             fake = FakeDocker()
@@ -67,7 +62,9 @@ class ReproCapsuleContainerTests(unittest.TestCase):
             self.assertEqual(report["decision"], "reproduced")
             self.assertTrue(report["executed"])
             self.assertTrue(report["container_built"])
+            build = next(call for call in fake.calls if call[:2] == ["docker", "build"])
             run = next(call for call in fake.calls if call[:2] == ["docker", "run"])
+            self.assertIn("--network none", " ".join(build))
             joined = " ".join(run)
             self.assertIn("--network none", joined)
             self.assertIn("--read-only", run)
@@ -76,6 +73,7 @@ class ReproCapsuleContainerTests(unittest.TestCase):
             self.assertIn("--pids-limit 128", joined)
             self.assertIn("--memory 512m", joined)
             self.assertIn("--cpus 1.0", joined)
+            self.assertTrue(report["safety"]["build_network_disabled"])
 
     def test_divergence_is_reported(self):
         with tempfile.TemporaryDirectory() as tmp:
