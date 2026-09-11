@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,22 @@ def _load_json(path: str | Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise CommitmentGuardError("document must be a JSON object")
     return data
+
+
+def _parse_time(value: str, field: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise CommitmentGuardError(f"{field} must be a valid ISO-8601 timestamp") from exc
+    if parsed.tzinfo is None:
+        raise CommitmentGuardError(f"{field} must include a timezone")
+    return parsed.astimezone(timezone.utc)
+
+
+def _resolve_as_of(value: str | None) -> datetime:
+    if value is None:
+        return datetime.now(timezone.utc)
+    return _parse_time(value, "as_of")
 
 
 def _get_nested(mapping: dict[str, Any], dotted_key: str) -> tuple[bool, Any]:
@@ -64,6 +81,19 @@ def _check(actual: Any, rule: dict[str, Any]) -> tuple[str, str]:
     return ("PASS", f"contains {expected!r}") if ok else ("FAIL", f"expected value containing {expected!r}, got {actual!r}")
 
 
+def _validate_evidence_rule(cid: str, rule: Any) -> None:
+    if not isinstance(rule, dict) or not isinstance(rule.get("key"), str) or not rule["key"]:
+        return
+    if "max_age_seconds" in rule:
+        value = rule["max_age_seconds"]
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+            raise CommitmentGuardError(f"commitment {cid}.evidence.max_age_seconds must be a non-negative number")
+    if "allowed_source_kinds" in rule:
+        kinds = rule["allowed_source_kinds"]
+        if not isinstance(kinds, list) or not kinds or not all(isinstance(item, str) and item for item in kinds):
+            raise CommitmentGuardError(f"commitment {cid}.evidence.allowed_source_kinds must be a non-empty list of strings")
+
+
 def _validate_contract(contract: dict[str, Any]) -> list[dict[str, Any]]:
     schema_version = str(contract.get("schema_version", "0.1"))
     if schema_version not in {"0.1", "0.2"}:
@@ -87,6 +117,7 @@ def _validate_contract(contract: dict[str, Any]) -> list[dict[str, Any]]:
         required = raw.get("required", True)
         if not isinstance(required, bool):
             raise CommitmentGuardError(f"commitment {cid}.required must be boolean")
+        _validate_evidence_rule(cid, raw.get("evidence"))
         normalized.append(raw)
     return normalized
 
@@ -107,6 +138,7 @@ def _observation(evidence: dict[str, Any], key: str) -> tuple[bool, Any, dict[st
         if "observed_at" in item:
             if not isinstance(item["observed_at"], str) or not item["observed_at"]:
                 raise CommitmentGuardError(f"evidence observation {key!r}.observed_at must be a non-empty string")
+            _parse_time(item["observed_at"], f"evidence observation {key!r}.observed_at")
             provenance["observed_at"] = item["observed_at"]
         return True, item["value"], provenance or None
 
@@ -114,11 +146,40 @@ def _observation(evidence: dict[str, Any], key: str) -> tuple[bool, Any, dict[st
     return found, actual, None
 
 
+def _check_evidence_policy(
+    rule: dict[str, Any],
+    provenance: dict[str, Any] | None,
+    as_of: datetime,
+) -> tuple[str, str] | None:
+    allowed_source_kinds = rule.get("allowed_source_kinds")
+    if allowed_source_kinds is not None:
+        source = provenance.get("source") if provenance else None
+        source_kind = source.get("kind") if isinstance(source, dict) else None
+        if not isinstance(source_kind, str) or not source_kind:
+            return "UNKNOWN", "evidence source kind required by policy"
+        if source_kind not in allowed_source_kinds:
+            return "UNKNOWN", f"evidence source kind {source_kind!r} is not allowed"
+
+    max_age_seconds = rule.get("max_age_seconds")
+    if max_age_seconds is not None:
+        observed_at = provenance.get("observed_at") if provenance else None
+        if not isinstance(observed_at, str):
+            return "UNKNOWN", "observed_at required by freshness policy"
+        observed = _parse_time(observed_at, "evidence observed_at")
+        age_seconds = (as_of - observed).total_seconds()
+        if age_seconds < 0:
+            return "UNKNOWN", "evidence observation is future-dated"
+        if age_seconds > float(max_age_seconds):
+            return "UNKNOWN", f"evidence is stale: age {age_seconds:.0f}s exceeds {float(max_age_seconds):.0f}s"
+    return None
+
+
 def _waiver_result(
     cid: str,
     description: str,
     required: bool,
     waiver: Any,
+    as_of: datetime,
 ) -> dict[str, Any] | None:
     if not waiver:
         return None
@@ -146,6 +207,17 @@ def _waiver_result(
             if not isinstance(waiver[key], str) or not waiver[key]:
                 raise CommitmentGuardError(f"commitment {cid}.waiver.{key} must be a non-empty string")
             result_waiver[key] = waiver[key]
+    if "expires_at" in result_waiver:
+        expiry = _parse_time(result_waiver["expires_at"], f"commitment {cid}.waiver.expires_at")
+        if as_of >= expiry:
+            return {
+                "id": cid,
+                "description": description,
+                "required": required,
+                "status": "UNKNOWN",
+                "detail": "waiver is expired",
+                "waiver": result_waiver,
+            }
     return {
         "id": cid,
         "description": description,
@@ -156,8 +228,14 @@ def _waiver_result(
     }
 
 
-def verify(contract: dict[str, Any], evidence: dict[str, Any]) -> dict[str, Any]:
+def verify(
+    contract: dict[str, Any],
+    evidence: dict[str, Any],
+    *,
+    as_of: str | None = None,
+) -> dict[str, Any]:
     commitments = _validate_contract(contract)
+    evaluation_time = _resolve_as_of(as_of)
     results: list[dict[str, Any]] = []
 
     for item in commitments:
@@ -165,7 +243,7 @@ def verify(contract: dict[str, Any], evidence: dict[str, Any]) -> dict[str, Any]
         description = str(item.get("description", ""))
         required = item.get("required", True)
 
-        waived = _waiver_result(cid, description, required, item.get("waiver"))
+        waived = _waiver_result(cid, description, required, item.get("waiver"), evaluation_time)
         if waived is not None:
             results.append(waived)
             continue
@@ -194,7 +272,12 @@ def verify(contract: dict[str, Any], evidence: dict[str, Any]) -> dict[str, Any]
             })
             continue
 
-        status, detail = _check(actual, rule)
+        policy_result = _check_evidence_policy(rule, provenance, evaluation_time)
+        if policy_result is not None:
+            status, detail = policy_result
+        else:
+            status, detail = _check(actual, rule)
+
         result: dict[str, Any] = {
             "id": cid,
             "description": description,
@@ -222,6 +305,7 @@ def verify(contract: dict[str, Any], evidence: dict[str, Any]) -> dict[str, Any]
 
     return {
         "schema_version": "0.2",
+        "as_of": evaluation_time.isoformat().replace("+00:00", "Z"),
         "verified_complete": completion_state == "verified_complete",
         "required_satisfied": not required_blockers,
         "completion_state": completion_state,
@@ -236,12 +320,17 @@ def verify(contract: dict[str, Any], evidence: dict[str, Any]) -> dict[str, Any]
     }
 
 
-def verify_files(contract_path: str | Path, evidence_path: str | Path) -> dict[str, Any]:
-    return verify(_load_json(contract_path), _load_json(evidence_path))
+def verify_files(
+    contract_path: str | Path,
+    evidence_path: str | Path,
+    *,
+    as_of: str | None = None,
+) -> dict[str, Any]:
+    return verify(_load_json(contract_path), _load_json(evidence_path), as_of=as_of)
 
 
 def render_text(report: dict[str, Any]) -> str:
-    lines = ["TrustForge CommitmentGuard", "==========================", ""]
+    lines = ["TrustForge CommitmentGuard", "==========================", "", f"As of: {report['as_of']}", ""]
     for item in report["commitments"]:
         scope = "required" if item.get("required", True) else "optional"
         lines.append(f"{item['id']} {item['status']} ({scope}): {item['description']}")
