@@ -6,7 +6,6 @@ import os
 import platform
 import re
 import shutil
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -132,6 +131,11 @@ def validate_spec(spec: dict[str, Any]) -> dict[str, Any]:
 def sanitize_trace(text: str) -> tuple[str, int]:
     redactions = 0
 
+    # Remove bearer payloads first. Otherwise an "Authorization: Bearer ..." line
+    # can be partially consumed by the generic key/value redactor.
+    text, count = BEARER_RE.subn("Bearer [REDACTED]", text)
+    redactions += count
+
     def assignment(match: re.Match[str]) -> str:
         nonlocal redactions
         redactions += 1
@@ -139,7 +143,6 @@ def sanitize_trace(text: str) -> tuple[str, int]:
 
     text = SECRET_ASSIGNMENT_RE.sub(assignment, text)
     for regex, replacement in (
-        (BEARER_RE, "Bearer [REDACTED]"),
         (AWS_KEY_RE, "[REDACTED_AWS_KEY]"),
         (GENERIC_TOKEN_RE, "[REDACTED_TOKEN]"),
     ):
