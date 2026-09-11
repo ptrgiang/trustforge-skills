@@ -1,0 +1,17 @@
+schema_version: "0.1"
+name: parser-regression
+command:
+  - python
+  - parser_demo.py
+  - fixtures/input.json
+expected_exit_code: 1
+trace_file: failing-trace.txt
+inputs:
+  - path: fixtures/input.json
+    copy: true
+  - path: parser_demo.py
+    copy: true
+environment:
+  include:
+    - CI
+    - PYTHONHASHSEED
