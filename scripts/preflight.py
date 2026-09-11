@@ -27,7 +27,17 @@ def check_version() -> None:
 
 def main() -> int:
     python = sys.executable
+
     run(python, "-m", "unittest", "discover", "-s", "tests", "-v")
+    run(
+        python,
+        "-m",
+        "trustforge.cli",
+        "verify",
+        "examples/refactor-contract.json",
+        "--evidence",
+        "examples/refactor-evidence.json",
+    )
 
     run(
         python,
@@ -41,6 +51,34 @@ def main() -> int:
         "0.90",
         "--min-recall",
         "0.85",
+    )
+    run(
+        python,
+        "-m",
+        "trustforge.cli",
+        "datalease",
+        "benchmark",
+        "--dataset",
+        "evals/datalease/classifier-benchmark-multilingual.jsonl",
+        "--min-precision",
+        "0.90",
+        "--min-recall",
+        "0.90",
+    )
+    run(
+        python,
+        "-m",
+        "trustforge.cli",
+        "freshplan",
+        "benchmark",
+        "--nodes",
+        "1000",
+        "5000",
+        "10000",
+        "--repeats",
+        "2",
+        "--max-median-ms",
+        "5000",
     )
     run(
         python,
@@ -60,7 +98,6 @@ def main() -> int:
         tmp_path = Path(tmp)
         capsule = tmp_path / "capsule"
         exported = tmp_path / "container"
-        report_path = tmp_path / "replay.json"
 
         run(
             python,
@@ -89,7 +126,6 @@ def main() -> int:
             cwd=ROOT,
             text=True,
         )
-        report_path.write_text(output, encoding="utf-8")
         report = json.loads(output)
         if report["decision"] != "reproduced":
             raise RuntimeError(f"ReproCapsule replay did not reproduce: {report['decision']}")
