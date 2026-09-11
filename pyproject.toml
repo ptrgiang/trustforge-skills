@@ -4,13 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "trustforge-skills"
-version = "0.3.0"
+version = "0.4.0.dev0"
 description = "Trust, verification, privacy and reliability primitives for autonomous AI agents"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "Apache-2.0"}
 authors = [{name = "TrustForge contributors"}]
-keywords = ["ai-agents", "agent-skills", "verification", "reliability", "security"]
+dependencies = [
+  "PyYAML>=6.0",
+]
+keywords = ["ai-agents", "agent-skills", "verification", "reliability", "security", "privacy"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "License :: OSI Approved :: Apache Software License",

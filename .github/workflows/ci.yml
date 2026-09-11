@@ -24,6 +24,23 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: CommitmentGuard smoke test
         run: trustforge verify examples/refactor-contract.json --evidence examples/refactor-evidence.json
+      - name: DataLease smoke test
+        run: |
+          mkdir -p .artifacts
+          trustforge datalease apply \
+            --policy examples/datalease/support-policy.yaml \
+            --purpose "send order summary to support tool" \
+            --input examples/datalease/order-payload.json \
+            --payload-only > .artifacts/datalease-output.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          actual = json.loads(Path(".artifacts/datalease-output.json").read_text())
+          expected = json.loads(Path("examples/datalease/expected-payload.json").read_text())
+          assert actual == expected
+          print("DataLease smoke test passed")
+          PY
 
   action-smoke:
     runs-on: ubuntu-latest

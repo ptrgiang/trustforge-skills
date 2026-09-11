@@ -1,0 +1,26 @@
+version: "0.1"
+purpose: send order summary to support tool
+
+default_action: deny
+
+hard_deny_classifiers:
+  - secret
+
+rules:
+  - id: order-summary
+    paths:
+      - order.id
+      - order.status
+      - items.*.sku
+      - items.*.quantity
+    action: allow
+    reason: Required to explain the order state.
+
+  - id: customer-email
+    paths:
+      - customer.email
+    classifiers:
+      - pii.email
+    action: redact
+    strategy: email_domain
+    reason: The domain is sufficient for this support workflow; the local-part is unnecessary.

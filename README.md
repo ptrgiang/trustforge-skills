@@ -1,7 +1,7 @@
 # TrustForge Skills
 
 [![CI](https://github.com/ptrgiang/trustforge-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/ptrgiang/trustforge-skills/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/badge/release-v0.3.0-7c3aed)](docs/releases/v0.3.0.md)
+[![Release](https://img.shields.io/badge/release-v0.3.0-7c3aed)](https://github.com/ptrgiang/trustforge-skills/releases/tag/v0.3.0)
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)](pyproject.toml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
@@ -24,32 +24,13 @@ TrustForge turns those questions into reusable skills, contracts, evidence, and 
 
 | Skill | Purpose | Status |
 | --- | --- | --- |
-| **SkillDiff** | Detect trust-boundary changes between skill versions | **v0.3 flagship** |
-| **CommitmentGuard** | Require evidence for user constraints before an agent can claim completion | MVP |
-| **DataLease** | Minimize and gate data shared with tools/APIs | Planned |
+| **SkillDiff** | Detect trust-boundary changes between skill versions | **v0.3 released** |
+| **DataLease** | Enforce purpose-bound minimum-necessary data sharing | **v0.4 MVP on `main`** |
+| **CommitmentGuard** | Require evidence before an agent can claim completion | MVP |
 | **FreshPlan** | Invalidate plan nodes when facts become stale | Planned |
 | **ReproCapsule** | Package failures into reproducible environments | Planned |
 
-## Use SkillDiff in GitHub Actions
-
-The fastest way to adopt TrustForge is as a CI gate:
-
-```yaml
-- uses: actions/checkout@v4
-
-- name: Audit candidate skill
-  uses: ptrgiang/trustforge-skills@v0
-  with:
-    before: fixtures/trusted-skill
-    after: skills/candidate-skill
-    fail-on: medium
-    format: sarif
-    report-path: artifacts/skilldiff.sarif
-```
-
-`v0` is the floating stable pre-1.0 action line. For security-sensitive workflows, pin an exact commit SHA. A complete copy-paste workflow is available at [`examples/github-actions/skilldiff.yml`](examples/github-actions/skilldiff.yml).
-
-## Why SkillDiff
+## SkillDiff — audit trust-boundary changes
 
 A normal file diff answers **what text changed**. SkillDiff tries to answer **what trust assumptions changed**.
 
@@ -71,23 +52,94 @@ declared vs observed capability manifest
 risk explanations + JSON/SARIF
 ```
 
-Example:
+Use the released GitHub Action:
 
-```text
-TrustForge SkillDiff
-====================
-Risk: HIGH
+```yaml
+- uses: actions/checkout@v4
 
-Why:
-  - New capabilities detected: environment_read, network, subprocess.
-  - Python AST discovered structured behavior missed by lexical matching.
-  - New dependency detected: httpx.
-  - New secret-like environment reference detected: API_TOKEN.
-  - Skill trigger scope appears to have expanded.
-  - Observed capabilities are missing from the declared manifest.
+- name: Audit candidate skill
+  uses: ptrgiang/trustforge-skills@v0
+  with:
+    before: fixtures/trusted-skill
+    after: skills/candidate-skill
+    fail-on: medium
+    format: sarif
+    report-path: artifacts/skilldiff.sarif
 ```
 
+`v0` is the floating stable pre-1.0 action line. For security-sensitive workflows, pin an exact commit SHA. A complete workflow is available at [`examples/github-actions/skilldiff.yml`](examples/github-actions/skilldiff.yml).
+
+## DataLease — share only what the task needs
+
+DataLease sits immediately before a tool/API/MCP/connector boundary:
+
+```text
+Agent payload
+    ↓
+Declared purpose
+    ↓
+DataLease policy
+    ↓
+Field classification
+    ↓
+allow / redact / deny
+    ↓
+Minimum-necessary payload + audit trail
+```
+
+Example policy:
+
+```yaml
+version: "0.1"
+purpose: send order summary to support tool
+default_action: deny
+hard_deny_classifiers:
+  - secret
+
+rules:
+  - id: order-summary
+    paths:
+      - order.id
+      - order.status
+      - items.*.sku
+      - items.*.quantity
+    action: allow
+
+  - id: customer-email
+    paths:
+      - customer.email
+    classifiers:
+      - pii.email
+    action: redact
+    strategy: email_domain
+```
+
+Apply it:
+
+```bash
+trustforge datalease apply \
+  --policy examples/datalease/support-policy.yaml \
+  --purpose "send order summary to support tool" \
+  --input examples/datalease/order-payload.json
+```
+
+Pipe only the projected payload to another tool:
+
+```bash
+trustforge datalease apply \
+  --policy examples/datalease/support-policy.yaml \
+  --purpose "send order summary to support tool" \
+  --input examples/datalease/order-payload.json \
+  --payload-only
+```
+
+The MVP provides exact purpose binding, nested wildcard paths, `allow`/`redact`/`deny`, basic PII/secret classifiers, hard-deny classifiers with `secret` enabled by default, value-free audit records, JSON/YAML policies, and redaction strategies `mask`, `null`, `last4`, and `email_domain`.
+
+DataLease is a data-minimization policy engine, not a compliance certification and not a guarantee about downstream retention or use.
+
 ## Local quick start
+
+Development head currently targets `0.4.0.dev0`:
 
 ```bash
 git clone https://github.com/ptrgiang/trustforge-skills.git
@@ -95,22 +147,12 @@ cd trustforge-skills
 pip install -e .
 ```
 
-Human-readable report:
+SkillDiff:
 
 ```bash
 trustforge skilldiff ./before-skill ./after-skill
-```
-
-Machine-readable output:
-
-```bash
 trustforge skilldiff ./before-skill ./after-skill --format json
 trustforge skilldiff ./before-skill ./after-skill --format sarif > skilldiff.sarif
-```
-
-CI threshold:
-
-```bash
 trustforge skilldiff ./before-skill ./after-skill --fail-on medium
 ```
 
@@ -121,23 +163,20 @@ trustforge verify examples/refactor-contract.json \
   --evidence examples/refactor-evidence.json
 ```
 
-## Python AST detector
+DataLease:
 
-SkillDiff v0.3 parses candidate Python with the standard-library `ast` module. It does **not** import or execute candidate code.
-
-It resolves common aliases such as:
-
-```python
-import subprocess as sp
-import requests as rq
-from os import getenv as read_env
-
-read_env("DEPLOY_TOKEN")
-rq.post(endpoint, json=payload)
-sp.run(["echo", "done"], check=True)
+```bash
+trustforge datalease apply \
+  --policy examples/datalease/support-policy.json \
+  --purpose "send order summary to support tool" \
+  --input examples/datalease/order-payload.json \
+  --payload-only \
+  --audit-output .artifacts/datalease-audit.json
 ```
 
-It also distinguishes read/write modes for `open()` and attaches structured provenance such as detector, symbol, source line, and confidence.
+## Python AST detector
+
+SkillDiff v0.3 parses candidate Python with the standard-library `ast` module. It does **not** import or execute candidate code. It resolves common aliases and distinguishes read/write modes for `open()`, attaching detector, symbol, source line, and confidence to structured evidence.
 
 ## Capability manifests
 
@@ -184,7 +223,8 @@ trustforge-skills/
 ├── action.yml
 ├── skills/
 │   ├── skilldiff/
-│   └── commitment-guard/
+│   ├── commitment-guard/
+│   └── datalease/
 ├── trustforge/
 ├── contracts/
 ├── examples/
@@ -195,11 +235,11 @@ trustforge-skills/
 
 ## Release and compatibility
 
-- Current package/action line: **v0.3.0**.
+- Latest stable release: **v0.3.0**.
 - Floating stable GitHub Action ref: **`v0`**.
+- `main` currently contains the DataLease v0.4 development MVP.
 - Security-sensitive consumers should pin an exact commit SHA.
 - Changes are documented in [`CHANGELOG.md`](CHANGELOG.md).
-- v0.3.0 notes: [`docs/releases/v0.3.0.md`](docs/releases/v0.3.0.md).
 
 ## Roadmap
 
@@ -207,11 +247,11 @@ See [`ROADMAP.md`](ROADMAP.md).
 
 ## Contributing
 
-Contributions are especially welcome for adversarial SkillDiff evals, new language detectors, agent-runtime integrations, and prior-art references. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Contributions are especially welcome for adversarial evals, privacy-policy fixtures, new language detectors, agent-runtime integrations, and prior-art references. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Security
 
-TrustForge analyzes agent capabilities and may eventually execute sandboxed canary tasks. Please read [`SECURITY.md`](SECURITY.md) before reporting security-sensitive findings.
+TrustForge analyzes agent capabilities and enforces data-minimization policies. Please read [`SECURITY.md`](SECURITY.md) before reporting security-sensitive findings.
 
 ## License
 

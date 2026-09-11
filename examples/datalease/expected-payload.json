@@ -1,0 +1,8 @@
+{
+  "customer": {"email": "***@example.com"},
+  "items": [
+    {"quantity": 2, "sku": "SKU-1"},
+    {"quantity": 1, "sku": "SKU-2"}
+  ],
+  "order": {"id": "A-100", "status": "shipped"}
+}

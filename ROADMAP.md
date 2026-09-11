@@ -34,6 +34,7 @@ TrustForge is intentionally starting narrow: prove the trust primitives before e
 - [x] Changelog and release notes
 - [x] Copy-paste GitHub Actions example
 - [x] Floating stable `v0` action line
+- [x] Release `v0.3.0`
 
 ### SkillDiff research backlog
 
@@ -45,13 +46,21 @@ TrustForge is intentionally starting narrow: prove the trust primitives before e
 
 ## v0.4 — DataLease
 
-Purpose-bound data projection for tool/API calls.
+Purpose-bound minimum-necessary data projection before tool/API/MCP calls.
 
-- field-level necessity rules;
-- PII classification hooks;
-- allow/deny/redact actions;
-- MCP proxy reference implementation;
-- audit log explaining why a field was shared.
+- [x] Purpose-bound transfer authorization
+- [x] Field-path allow/redact/deny rules
+- [x] JSON and YAML policy loading
+- [x] Built-in PII/secret classifier hooks
+- [x] Configurable hard-deny classifiers with `secret` safe default
+- [x] Nested wildcard paths such as `items.*.sku`
+- [x] Redaction strategies (`mask`, `null`, `last4`, `email_domain`)
+- [x] Value-free audit trail explaining every leaf decision
+- [x] CLI with payload-only and separate audit output
+- [x] Policy JSON Schema, examples, unit tests, and CI smoke test
+- [ ] Reference MCP/HTTP interception adapter
+- [ ] Pluggable classifier interface
+- [ ] Policy precision/recall benchmark fixtures
 
 ## v0.5 — FreshPlan
 

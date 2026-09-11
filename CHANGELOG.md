@@ -6,9 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- DataLease purpose-bound payload projection engine.
+- JSON/YAML policies with field-level `allow`, `redact`, and `deny` actions.
+- Safe-default hard-deny classifiers, with `secret` enabled by default.
+- PII/secret classifier hooks and nested wildcard paths.
+- Redaction strategies for masking, nulling, last-four preservation, and email-domain preservation.
+- Value-free decision audit trails.
+- `trustforge datalease apply` CLI with payload-only and separate audit-report modes.
+- DataLease policy schema, examples, unit tests, and CI smoke test.
+
 ### Planned
 
-- JavaScript/TypeScript structured detectors.
+- DataLease MCP/HTTP interception adapter and pluggable classifier interface.
+- JavaScript/TypeScript structured SkillDiff detectors.
 - Transitive dependency capability analysis.
 - Signed capability baselines.
 - Sandboxed behavioral canary replay.
@@ -53,7 +65,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Initial CommitmentGuard evidence verifier.
 - CLI, tests, contracts, examples, CI, security policy, and contributing guide.
 
-[Unreleased]: https://github.com/ptrgiang/trustforge-skills/compare/v0...main
-[0.3.0]: https://github.com/ptrgiang/trustforge-skills/commits/main
+[Unreleased]: https://github.com/ptrgiang/trustforge-skills/compare/v0.3.0...main
+[0.3.0]: https://github.com/ptrgiang/trustforge-skills/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ptrgiang/trustforge-skills/commits/abfadc6be0c3c4442696d5ed99b47134bd4eea3a
 [0.1.0]: https://github.com/ptrgiang/trustforge-skills/commits/07631d19859f57dbf534039933b606cd0347c7d8

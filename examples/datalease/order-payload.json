@@ -1,0 +1,13 @@
+{
+  "order": {"id": "A-100", "status": "shipped", "total": 39.5},
+  "customer": {
+    "email": "alice@example.com",
+    "phone": "+1 202-555-0187",
+    "full_name": "Alice Example"
+  },
+  "items": [
+    {"sku": "SKU-1", "quantity": 2, "cost": 10.0},
+    {"sku": "SKU-2", "quantity": 1, "cost": 19.5}
+  ],
+  "internal": {"api_token": "super-secret-token"}
+}
