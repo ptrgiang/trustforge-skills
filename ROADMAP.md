@@ -103,7 +103,11 @@ Freshness-aware dependency graphs and conservative recovery for long-running age
 - [x] Policy-bound replacement evidence can preserve existing freshness policy
 - [x] Deterministic large-graph benchmark CLI
 - [x] 10k-node CI performance regression gate
-- [x] Development version advanced to `0.5.0.dev2`
+- [x] Freeze FreshPlan contract/version compatibility notes
+- [x] Prepare v0.5.0 release notes and checklist
+- [x] Finalize package/runtime version to `0.5.0`
+- [ ] Run final CI/release-candidate matrix
+- [ ] Release `v0.5.0` and advance stable `v0` only after verification
 
 ### FreshPlan research backlog
 
@@ -112,13 +116,6 @@ Freshness-aware dependency graphs and conservative recovery for long-running age
 - [ ] Persistent state-store adapter for applying replacement metadata without copying raw values into reports
 - [ ] Larger and more varied graph-shape benchmarks
 - [ ] Domain-specific freshness-policy profiles and policy linting
-
-### v0.5 release hardening
-
-- [ ] Freeze FreshPlan contract/version compatibility notes
-- [ ] Prepare v0.5.0 release notes and checklist
-- [ ] Run final CI/release-candidate matrix
-- [ ] Release `v0.5.0` and advance stable `v0` only after verification
 
 ## v0.6 — ReproCapsule
 
