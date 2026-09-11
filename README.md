@@ -17,11 +17,11 @@ TrustForge does not try to be another agent framework. It sits around agent work
 
 | Primitive | What it does | Status |
 | --- | --- | --- |
-| **SkillDiff** | Detects trust-boundary changes between skill versions | Released |
-| **DataLease** | Sends only the minimum necessary data to approved destinations | Released |
-| **FreshPlan** | Detects aging evidence and re-plans only affected branches | **v0.5.0** |
-| **CommitmentGuard** | Requires evidence before completion claims | **v0.7.0** |
-| **ReproCapsule** | Packages failures, verifies replay, exports/replays container contexts, and gates trace redaction | **v0.6.0** |
+| **SkillDiff** | Detects trust-boundary changes between skill versions | **Released** |
+| **DataLease** | Sends only the minimum necessary data to approved destinations | **Released** |
+| **FreshPlan** | Detects aging evidence and re-plans only affected branches | **Released** |
+| **CommitmentGuard** | Requires evidence before completion claims | **Released** |
+| **ReproCapsule** | Packages failures, verifies replay, exports/replays container contexts, and gates trace redaction | **Released** |
 
 ## Who this is for
 
