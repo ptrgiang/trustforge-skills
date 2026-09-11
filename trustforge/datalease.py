@@ -5,7 +5,9 @@ import ipaddress
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
+
+from .datalease_classifiers import ClassificationFinding, FieldClassifier, normalize_findings
 
 try:
     import yaml
@@ -18,9 +20,11 @@ class DataLeaseError(ValueError):
 
 
 _REMOVE = object()
+_BUILTIN_DETECTOR = "builtin-heuristics-v1"
+_BUILTIN_CONFIDENCE = 0.75
 
 SECRET_NAME_RE = re.compile(
-    r"(?:^|[._-])(?:secret|token|password|passwd|api[_-]?key|private[_-]?key|client[_-]?secret|credential)(?:$|[._-])",
+    r"(?:^|[._-])(?:secret|token|password|passwd|authorization|api[_-]?key|private[_-]?key|client[_-]?secret|credential)(?:$|[._-])",
     re.IGNORECASE,
 )
 EMAIL_NAME_RE = re.compile(r"(?:^|[._-])e?mail(?:$|[._-])", re.IGNORECASE)
@@ -44,6 +48,8 @@ PAYMENT_NAME_RE = re.compile(
 )
 EMAIL_VALUE_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PHONE_VALUE_RE = re.compile(r"^\+?[0-9][0-9().\-\s]{6,}[0-9]$")
+ISO_DATE_VALUE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+SSN_VALUE_RE = re.compile(r"^\d{3}-\d{2}-\d{4}$")
 
 
 def _normalize_purpose(value: str) -> str:
@@ -143,6 +149,8 @@ def _policy_purposes(policy: dict[str, Any]) -> list[str]:
 
 
 def classify_field(path: str, value: Any) -> list[str]:
+    """Return labels from TrustForge's built-in conservative heuristics."""
+
     classifiers: set[str] = set()
 
     if SECRET_NAME_RE.search(path):
@@ -166,18 +174,63 @@ def classify_field(path: str, value: Any) -> list[str]:
         stripped = value.strip()
         if EMAIL_VALUE_RE.fullmatch(stripped):
             classifiers.add("pii.email")
-        if PHONE_VALUE_RE.fullmatch(stripped):
-            digits = re.sub(r"\D", "", stripped)
-            if 8 <= len(digits) <= 15:
-                classifiers.add("pii.phone")
+
+        is_ip = False
         try:
             ipaddress.ip_address(stripped)
         except ValueError:
             pass
         else:
+            is_ip = True
             classifiers.add("network.ip")
 
+        if (
+            PHONE_VALUE_RE.fullmatch(stripped)
+            and not is_ip
+            and not ISO_DATE_VALUE_RE.fullmatch(stripped)
+            and not SSN_VALUE_RE.fullmatch(stripped)
+        ):
+            digits = re.sub(r"\D", "", stripped)
+            if 8 <= len(digits) <= 15:
+                classifiers.add("pii.phone")
+
     return sorted(classifiers)
+
+
+def classify_with_plugins(
+    path: str,
+    value: Any,
+    classifiers: Iterable[FieldClassifier] | None = None,
+) -> list[ClassificationFinding]:
+    """Run built-in heuristics plus trusted caller-supplied classifiers."""
+
+    findings = [
+        ClassificationFinding(
+            label=label,
+            detector=_BUILTIN_DETECTOR,
+            confidence=_BUILTIN_CONFIDENCE,
+            reason="Built-in path/value heuristic.",
+        )
+        for label in classify_field(path, value)
+    ]
+
+    for classifier in tuple(classifiers or ()):
+        try:
+            findings.extend(normalize_findings(classifier, path, value))
+        except (TypeError, ValueError) as exc:
+            detector = str(getattr(classifier, "name", classifier.__class__.__name__))
+            raise DataLeaseError(f"Classifier {detector!r} failed: {exc}") from exc
+        except Exception as exc:
+            detector = str(getattr(classifier, "name", classifier.__class__.__name__))
+            raise DataLeaseError(f"Classifier {detector!r} raised {type(exc).__name__}: {exc}") from exc
+
+    deduped: dict[tuple[str, str], ClassificationFinding] = {}
+    for finding in findings:
+        key = (finding.detector, finding.label)
+        previous = deduped.get(key)
+        if previous is None or finding.confidence > previous.confidence:
+            deduped[key] = finding
+    return sorted(deduped.values(), key=lambda item: (item.label, item.detector))
 
 
 def _matches_path(pattern: str, path: str) -> bool:
@@ -201,8 +254,8 @@ def _normalize_rule(rule: dict[str, Any], index: int) -> dict[str, Any]:
     }
 
 
-def _select_rule(policy: dict[str, Any], path: str, classifiers: list[str]) -> dict[str, Any] | None:
-    classifier_set = set(classifiers)
+def _select_rule(policy: dict[str, Any], path: str, labels: list[str]) -> dict[str, Any] | None:
+    classifier_set = set(labels)
     for index, raw_rule in enumerate(policy.get("rules", [])):
         rule = _normalize_rule(raw_rule, index)
         path_ok = not rule["paths"] or any(_matches_path(pattern, path) for pattern in rule["paths"])
@@ -232,26 +285,30 @@ def _leaf_decision(
     path: str,
     value: Any,
     audit: list[dict[str, Any]],
+    classifiers: tuple[FieldClassifier, ...],
 ) -> Any:
-    classifiers = classify_field(path, value)
+    evidence = classify_with_plugins(path, value, classifiers)
+    labels = sorted({finding.label for finding in evidence})
+    classifier_evidence = [finding.as_dict() for finding in evidence]
 
     hard_deny = policy.get("hard_deny_classifiers", ["secret"])
     if isinstance(hard_deny, str):
         hard_deny = [hard_deny]
-    hard_match = sorted(set(classifiers).intersection(hard_deny))
+    hard_match = sorted(set(labels).intersection(hard_deny))
     if hard_match:
         audit.append(
             {
                 "path": path,
                 "action": "deny",
-                "classifiers": classifiers,
+                "classifiers": labels,
+                "classifier_evidence": classifier_evidence,
                 "rule_id": f"hard-deny:{hard_match[0]}",
                 "reason": "Matched a policy hard-deny classifier.",
             }
         )
         return _REMOVE
 
-    rule = _select_rule(policy, path, classifiers)
+    rule = _select_rule(policy, path, labels)
 
     if rule is None:
         action = str(policy.get("default_action", "deny"))
@@ -264,10 +321,11 @@ def _leaf_decision(
         rule_id = rule["id"]
         reason = rule["reason"] or "Matched policy rule."
 
-    entry = {
+    entry: dict[str, Any] = {
         "path": path,
         "action": action,
-        "classifiers": classifiers,
+        "classifiers": labels,
+        "classifier_evidence": classifier_evidence,
         "rule_id": rule_id,
         "reason": reason,
     }
@@ -287,12 +345,13 @@ def _project(
     policy: dict[str, Any],
     path: str,
     audit: list[dict[str, Any]],
+    classifiers: tuple[FieldClassifier, ...],
 ) -> Any:
     if isinstance(value, dict):
         output: dict[str, Any] = {}
         for key, child in value.items():
             child_path = f"{path}.{key}" if path else str(key)
-            projected = _project(child, policy, child_path, audit)
+            projected = _project(child, policy, child_path, audit, classifiers)
             if projected is not _REMOVE:
                 output[key] = projected
         return output if output else _REMOVE
@@ -301,12 +360,12 @@ def _project(
         output_list: list[Any] = []
         for index, child in enumerate(value):
             child_path = f"{path}.{index}" if path else str(index)
-            projected = _project(child, policy, child_path, audit)
+            projected = _project(child, policy, child_path, audit, classifiers)
             if projected is not _REMOVE:
                 output_list.append(projected)
         return output_list if output_list else _REMOVE
 
-    return _leaf_decision(policy, path or "$", value, audit)
+    return _leaf_decision(policy, path or "$", value, audit, classifiers)
 
 
 def _summary(audit: list[dict[str, Any]]) -> dict[str, int]:
@@ -317,11 +376,18 @@ def _summary(audit: list[dict[str, Any]]) -> dict[str, int]:
     }
 
 
-def apply_policy(policy: dict[str, Any], purpose: str, payload: Any) -> dict[str, Any]:
+def apply_policy(
+    policy: dict[str, Any],
+    purpose: str,
+    payload: Any,
+    *,
+    classifiers: Iterable[FieldClassifier] | None = None,
+) -> dict[str, Any]:
     validate_policy(policy)
     allowed_purposes = _policy_purposes(policy)
     normalized_allowed = {_normalize_purpose(item) for item in allowed_purposes}
     requested = _normalize_purpose(purpose)
+    classifier_plugins = tuple(classifiers or ())
 
     if requested not in normalized_allowed:
         audit = [
@@ -329,12 +395,13 @@ def apply_policy(policy: dict[str, Any], purpose: str, payload: Any) -> dict[str
                 "path": "$",
                 "action": "deny",
                 "classifiers": [],
+                "classifier_evidence": [],
                 "rule_id": "purpose-binding",
                 "reason": "Requested purpose is not authorized by this policy.",
             }
         ]
         return {
-            "schema_version": "0.1",
+            "schema_version": "0.2",
             "decision": "denied",
             "purpose": purpose,
             "authorized_purposes": allowed_purposes,
@@ -344,12 +411,12 @@ def apply_policy(policy: dict[str, Any], purpose: str, payload: Any) -> dict[str
         }
 
     audit: list[dict[str, Any]] = []
-    output = _project(payload, policy, "", audit)
+    output = _project(payload, policy, "", audit, classifier_plugins)
     if output is _REMOVE:
         output = None
 
     return {
-        "schema_version": "0.1",
+        "schema_version": "0.2",
         "decision": "projected",
         "purpose": purpose,
         "authorized_purposes": allowed_purposes,
@@ -363,13 +430,15 @@ def apply_files(
     policy_path: str | Path,
     input_path: str | Path,
     purpose: str,
+    *,
+    classifiers: Iterable[FieldClassifier] | None = None,
 ) -> dict[str, Any]:
     policy = load_policy(policy_path)
     try:
         payload = json.loads(Path(input_path).read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         raise DataLeaseError(f"Invalid JSON input payload: {exc}") from exc
-    return apply_policy(policy, purpose, payload)
+    return apply_policy(policy, purpose, payload, classifiers=classifiers)
 
 
 def dumps(report: dict[str, Any]) -> str:
