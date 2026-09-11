@@ -37,6 +37,7 @@ def build_parser() -> argparse.ArgumentParser:
     verify = sub.add_parser("verify", help="Verify completion commitments against an evidence JSON file")
     verify.add_argument("contract")
     verify.add_argument("--evidence", required=True)
+    verify.add_argument("--as-of", default=None, help="ISO-8601 evaluation time for evidence freshness and waiver expiry")
     verify.add_argument("--json", action="store_true", dest="as_json")
     verify.add_argument(
         "--accept-partial",
@@ -125,7 +126,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2 if args.fail_on and _risk_rank(report["risk"]["level"]) >= _risk_rank(args.fail_on) else 0
     if args.command == "verify":
         try:
-            report = verify_files(args.contract, args.evidence)
+            report = verify_files(args.contract, args.evidence, as_of=args.as_of)
         except CommitmentGuardError as exc:
             print(f"CommitmentGuard error: {exc}", file=sys.stderr)
             return 3
