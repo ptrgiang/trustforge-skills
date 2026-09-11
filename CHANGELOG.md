@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-11
+
 ### Added
 
 - CommitmentGuard contract schema v0.2 with required and optional commitments.
@@ -19,44 +21,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `trustforge verify --accept-partial` for workflows that explicitly permit optional commitments to remain incomplete.
 - CommitmentGuard adversarial stale/untrusted-evidence fixture and shared preflight gates.
 - `trustforge evidence command` for bounded `shell=False` command exit-code evidence collection.
-- `trustforge evidence json-artifact` for extracting a JSON field with SHA-256/size provenance.
-- `merge_bundles()` helper for combining distinct evidence observations with duplicate-key rejection.
-- Shared-preflight coverage for command and JSON artifact evidence collection.
 - `trustforge evidence pytest` for normalized pytest pass/fail evidence using `<python> -m pytest`.
-- Pytest collector and CLI orchestration regression tests without making pytest a TrustForge runtime dependency.
-- `trustforge evidence github-actions` for evidence based on GitHub Actions runtime metadata without API calls.
-- GitHub Actions provenance for repository, workflow, job, run ID/attempt, commit SHA, run URL, and optional ref/event metadata.
+- `trustforge evidence github-actions` for GitHub Actions runtime evidence without API calls or token access.
+- `trustforge evidence json-artifact` for extracting one JSON field with SHA-256/size provenance.
+- `trustforge evidence package-manifest` for exact package/dependency manifest SHA-256 evidence.
+- `trustforge evidence api-diff` for OpenAPI-like path+HTTP-method removal evidence.
+- `merge_bundles()` helper for combining distinct evidence observations with duplicate-key rejection.
+- Shared-preflight coverage for command, JSON artifact, package-manifest, and API-diff evidence collection.
 - Shared-preflight validation of GitHub Actions evidence on the real Actions runtime.
+- CLI/parser regression tests for pytest, GitHub Actions, package-manifest, and API-diff evidence adapters.
+- TrustForge v0.7.0 release notes and release checklist.
 
 ### Changed
 
-- Development package/runtime version advanced to `0.7.0.dev3`.
+- Package/runtime version advanced to `0.7.0`.
 - CommitmentGuard preserves legacy nested evidence and string-waiver compatibility while emitting report schema v0.2.
 - Stale, future-dated, expired-waiver, missing-policy metadata, and disallowed-source evidence fail closed to `UNKNOWN`.
 - Command evidence provenance omits raw argv, stdout, and stderr; it records executable, argument count, argv SHA-256, and exit code instead.
 - Pytest evidence uses normalized `source.kind: pytest` and records only Python executable, argument count, argv SHA-256, exit code, and no-output-capture flags.
 - GitHub Actions evidence uses normalized `source.kind: github-actions`; only explicit supported conclusions are accepted.
+- Package-manifest evidence uses the exact file SHA-256 as the observation value and descriptive manifest type as provenance.
+- API-diff evidence is intentionally scoped to removed OpenAPI path+method operations and stores hashes/counts rather than endpoint names.
 
 ### Security
 
 - Command and pytest evidence execute with `shell=False`, bounded timeouts, and stdout/stderr redirected to `DEVNULL`.
 - Evidence bundles do not copy raw command or pytest arguments, reducing accidental disclosure of command-line credentials. This does not make passing secrets on command lines safe.
-- Artifact SHA-256 identifies the exact bytes read but does not attest that the artifact producer was trustworthy.
+- Artifact/package-manifest SHA-256 identifies exact bytes but does not attest that the producer or dependency set was trustworthy.
 - Pytest exit status proves only the selected pytest process result; it does not prove the chosen test scope was sufficient for the underlying commitment.
 - GitHub Actions evidence fails closed outside Actions or when required runtime metadata is missing.
 - The GitHub Actions adapter does not read `GITHUB_TOKEN` and makes no GitHub API/network call.
 - GitHub Actions environment metadata and explicit conclusions are provenance, not cryptographic attestations from GitHub.
-
-### Planned
-
-- Package-manifest and API-diff evidence adapters.
-- Signed evidence attestations.
-- Cross-platform dependency/environment lock capture for ReproCapsule.
-- Framework adapters for coding-agent traces.
-- FreshPlan async refresh adapters and runtime integrations.
-- Larger multilingual/domain-specific DataLease benchmarks.
-- JavaScript/TypeScript structured SkillDiff detectors.
-- Transitive dependency capability analysis.
+- API-diff provenance does not copy endpoint names and is not presented as a general schema/semantic compatibility checker.
+- `partial` completion is distinct from verified full completion.
+- Structured waivers require an explicit reason and can expire; agents must not invent waivers.
 
 ## [0.6.0] - 2026-09-11
 
@@ -222,7 +220,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Initial CommitmentGuard evidence verifier.
 - CLI, tests, contracts, examples, CI, security policy, and contributing guide.
 
-[Unreleased]: https://github.com/ptrgiang/trustforge-skills/compare/v0.6.0...main
+[Unreleased]: https://github.com/ptrgiang/trustforge-skills/compare/v0.7.0...main
+[0.7.0]: https://github.com/ptrgiang/trustforge-skills/releases/tag/v0.7.0
 [0.6.0]: https://github.com/ptrgiang/trustforge-skills/releases/tag/v0.6.0
 [0.5.0]: https://github.com/ptrgiang/trustforge-skills/releases/tag/v0.5.0
 [0.4.0]: https://github.com/ptrgiang/trustforge-skills/releases/tag/v0.4.0
