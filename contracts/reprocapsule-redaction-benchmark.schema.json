@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ptrgiang/trustforge-skills/contracts/reprocapsule-redaction-benchmark.schema.json",
+  "title": "TrustForge ReproCapsule redaction benchmark report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset",
+    "cases",
+    "secret_cases",
+    "clean_cases",
+    "secret_recall",
+    "clean_specificity",
+    "failed_case_ids",
+    "results"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1"},
+    "dataset": {"type": "string"},
+    "cases": {"type": "integer", "minimum": 1},
+    "secret_cases": {"type": "integer", "minimum": 0},
+    "clean_cases": {"type": "integer", "minimum": 0},
+    "secret_recall": {"type": "number", "minimum": 0, "maximum": 1},
+    "clean_specificity": {"type": "number", "minimum": 0, "maximum": 1},
+    "failed_case_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "secret_case",
+          "secret_markers_removed",
+          "preserve_markers_retained",
+          "clean_text_unchanged",
+          "redactions",
+          "passed"
+        ],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "secret_case": {"type": "boolean"},
+          "secret_markers_removed": {"type": "boolean"},
+          "preserve_markers_retained": {"type": "boolean"},
+          "clean_text_unchanged": {"type": "boolean"},
+          "redactions": {"type": "integer", "minimum": 0},
+          "passed": {"type": "boolean"}
+        }
+      }
+    }
+  }
+}
