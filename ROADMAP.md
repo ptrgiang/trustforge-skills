@@ -181,7 +181,10 @@ Evidence-backed completion contracts for autonomous agents.
 - [x] Evidence-bundle merge helper with duplicate-key rejection
 - [x] Evidence collection CLI and shared-preflight integration
 - [x] Command provenance omits raw argv/stdout/stderr to reduce accidental secret disclosure
-- [ ] Dedicated pytest / GitHub Actions evidence adapters
+- [x] Dedicated pytest evidence adapter with normalized `source.kind: pytest`
+- [x] Pytest adapter keeps raw pytest args/stdout/stderr out of evidence provenance
+- [x] Pytest adapter CLI/orchestration tests without adding pytest as a runtime dependency
+- [ ] Dedicated GitHub Actions evidence adapter
 - [ ] Package-manifest / API-diff evidence adapters
 - [ ] Signed evidence attestations
 - [ ] Release hardening for `v0.7.0`
