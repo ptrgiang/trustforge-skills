@@ -1,7 +1,7 @@
 # TrustForge Skills
 
 [![CI](https://github.com/ptrgiang/trustforge-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/ptrgiang/trustforge-skills/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/badge/release-v0.7.0-7c3aed)](https://github.com/ptrgiang/trustforge-skills/releases/tag/v0.7.0)
+[![Release](https://img.shields.io/badge/release-v0.8.0-7c3aed)](https://github.com/ptrgiang/trustforge-skills/releases/tag/v0.8.0)
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)](pyproject.toml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
@@ -62,7 +62,7 @@ trustforge freshplan check \
   --as-of "2026-09-11T09:30:00Z"
 ```
 
-## CommitmentGuard v0.8.0 release candidate
+## CommitmentGuard v0.8.0
 
 CommitmentGuard turns completion claims into explicit contracts that can be checked against structured evidence.
 
@@ -232,7 +232,7 @@ The goal is useful infrastructure with measurable boundaries, not perfect detect
 
 TrustForge is still pre-1.0 and is being developed in the open. The repository includes implementation, eval fixtures, known limitations, release checklists, benchmark gates, and design tradeoffs as they evolve.
 
-The latest published stable release remains **v0.7.0** while v0.8.0 is in release-candidate validation. The floating stable `v0` ref remains pinned to the verified v0.7.0 release commit until v0.8.0 is published and verified.
+The latest stable release is **v0.8.0**. Future development continues on `main`; the floating stable `v0` ref points to the verified v0.8.0 release commit.
 
 ## Design principles
 
@@ -260,9 +260,9 @@ The latest published stable release remains **v0.7.0** while v0.8.0 is in releas
 
 ## Release and compatibility
 
-- Package/runtime version: **0.8.0** (release candidate)
-- Latest published stable release: **v0.7.0**
-- Floating stable GitHub Action ref: **`v0`**, still pinned to the verified v0.7.0 release commit
+- Package/runtime version: **0.8.0**
+- Latest stable release: **v0.8.0**
+- Floating stable GitHub Action ref: **`v0`**, pinned to the verified v0.8.0 release commit
 - License: Apache-2.0
 
 ## Contributing

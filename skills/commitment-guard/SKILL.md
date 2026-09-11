@@ -11,7 +11,7 @@ metadata:
 
 # CommitmentGuard
 
-Status: v0.8.0 release candidate
+Status: v0.8.0
 
 CommitmentGuard verifies whether an agent has enough evidence to make a completion claim.
 

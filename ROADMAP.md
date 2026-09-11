@@ -217,8 +217,8 @@ Cryptographic binding between an evidence observation, its provenance metadata, 
 - [x] Dedicated trust-model documentation
 - [x] Finalize package/runtime version to `0.8.0`
 - [x] Freeze v0.8 release scope and security boundaries
-- [ ] Run final CI/release-candidate matrix
-- [ ] Release `v0.8.0` and advance stable `v0`
+- [x] Run final CI/release-candidate matrix
+- [x] Release `v0.8.0` and advance stable `v0`
 
 ### CommitmentGuard research backlog
 
