@@ -22,23 +22,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `trustforge evidence json-artifact` for extracting a JSON field with SHA-256/size provenance.
 - `merge_bundles()` helper for combining distinct evidence observations with duplicate-key rejection.
 - Shared-preflight coverage for command and JSON artifact evidence collection.
+- `trustforge evidence pytest` for normalized pytest pass/fail evidence using `<python> -m pytest`.
+- Pytest collector and CLI orchestration regression tests without making pytest a TrustForge runtime dependency.
 
 ### Changed
 
-- Development package/runtime version advanced to `0.7.0.dev1`.
+- Development package/runtime version advanced to `0.7.0.dev2`.
 - CommitmentGuard preserves legacy nested evidence and string-waiver compatibility while emitting report schema v0.2.
 - Stale, future-dated, expired-waiver, missing-policy metadata, and disallowed-source evidence fail closed to `UNKNOWN`.
 - Command evidence provenance omits raw argv, stdout, and stderr; it records executable, argument count, argv SHA-256, and exit code instead.
+- Pytest evidence uses normalized `source.kind: pytest` and records only Python executable, argument count, argv SHA-256, exit code, and no-output-capture flags.
 
 ### Security
 
-- Command evidence executes with `shell=False`, a bounded timeout, and stdout/stderr redirected to `DEVNULL`.
-- Evidence bundles do not copy raw command arguments, reducing accidental disclosure of command-line credentials. This does not make passing secrets on command lines safe.
+- Command and pytest evidence execute with `shell=False`, bounded timeouts, and stdout/stderr redirected to `DEVNULL`.
+- Evidence bundles do not copy raw command or pytest arguments, reducing accidental disclosure of command-line credentials. This does not make passing secrets on command lines safe.
 - Artifact SHA-256 identifies the exact bytes read but does not attest that the artifact producer was trustworthy.
+- Pytest exit status proves only the selected pytest process result; it does not prove the chosen test scope was sufficient for the underlying commitment.
 
 ### Planned
 
-- Dedicated pytest and GitHub Actions CommitmentGuard evidence adapters.
+- Dedicated GitHub Actions CommitmentGuard evidence adapter.
 - Package-manifest and API-diff evidence adapters.
 - Signed evidence attestations.
 - Cross-platform dependency/environment lock capture for ReproCapsule.
