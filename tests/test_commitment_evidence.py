@@ -10,6 +10,7 @@ from trustforge.commitment_evidence import (
     CommitmentEvidenceError,
     collect_command_exit,
     collect_json_artifact,
+    collect_pytest,
     merge_bundles,
 )
 
@@ -60,6 +61,43 @@ class CommitmentEvidenceTests(unittest.TestCase):
             collect_command_exit("tests.passed", ["echo", "ok"], timeout_seconds=0)
         with self.assertRaises(CommitmentEvidenceError):
             collect_command_exit("tests.passed", ["echo", "ok"], timeout_seconds=301)
+
+    def test_pytest_adapter_builds_python_m_pytest_without_raw_args(self):
+        calls = []
+
+        def runner(argv, **kwargs):
+            calls.append((argv, kwargs))
+            return subprocess.CompletedProcess(argv, 0)
+
+        bundle = collect_pytest(
+            "tests.passed",
+            ["tests/test_api.py", "-q", "--token=super-secret"],
+            python_executable="python3",
+            observed_at="2026-09-11T14:45:00Z",
+            runner=runner,
+        )
+
+        observation = bundle["observations"]["tests.passed"]
+        source = observation["source"]
+        serialized = json.dumps(bundle)
+        self.assertTrue(observation["value"])
+        self.assertEqual(calls[0][0][:3], ["python3", "-m", "pytest"])
+        self.assertFalse(calls[0][1]["shell"])
+        self.assertEqual(source["kind"], "pytest")
+        self.assertEqual(source["python_executable"], "python3")
+        self.assertEqual(source["argument_count"], 3)
+        self.assertEqual(source["exit_code"], 0)
+        self.assertEqual(len(source["argv_sha256"]), 64)
+        self.assertNotIn("super-secret", serialized)
+        self.assertNotIn("test_api.py", serialized)
+
+    def test_pytest_adapter_nonzero_exit_is_false(self):
+        def runner(argv, **kwargs):
+            return subprocess.CompletedProcess(argv, 1)
+
+        bundle = collect_pytest("tests.passed", ["tests"], runner=runner)
+        self.assertFalse(bundle["observations"]["tests.passed"]["value"])
+        self.assertEqual(bundle["observations"]["tests.passed"]["source"]["exit_code"], 1)
 
     def test_json_artifact_adapter_extracts_value_and_hashes_source(self):
         with tempfile.TemporaryDirectory() as tmp:
