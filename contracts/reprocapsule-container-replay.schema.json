@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ptrgiang/trustforge-skills/contracts/reprocapsule-container-replay.schema.json",
+  "title": "TrustForge ReproCapsule container replay report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema_version", "name", "runtime", "decision", "executed", "container_built", "integrity", "safety"],
+  "properties": {
+    "schema_version": {"const": "0.1"},
+    "name": {"type": ["string", "null"]},
+    "runtime": {"const": "docker"},
+    "decision": {"enum": ["ready", "reproduced", "diverged", "blocked"]},
+    "reason": {"type": ["string", "null"]},
+    "executed": {"type": "boolean"},
+    "container_built": {"type": "boolean"},
+    "return_code": {"type": "integer"},
+    "expected_exit_code": {"type": ["integer", "null"]},
+    "exit_code_match": {"type": "boolean"},
+    "expected_failure_signature": {"type": ["string", "null"]},
+    "failure_signature_match": {"type": "boolean"},
+    "stdout": {"type": "string"},
+    "stderr": {"type": "string"},
+    "redactions": {"type": "integer", "minimum": 0},
+    "integrity": {"type": "object"},
+    "safety": {
+      "type": "object",
+      "required": ["build_network_disabled", "network_disabled", "read_only_rootfs", "capabilities_dropped", "no_new_privileges", "raw_environment_values_injected", "security_sandbox_claimed"],
+      "properties": {
+        "build_network_disabled": {"const": true},
+        "network_disabled": {"const": true},
+        "read_only_rootfs": {"const": true},
+        "capabilities_dropped": {"const": true},
+        "no_new_privileges": {"const": true},
+        "raw_environment_values_injected": {"const": false},
+        "security_sandbox_claimed": {"const": false}
+      }
+    }
+  }
+}
