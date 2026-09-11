@@ -15,17 +15,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Sanitized trace packaging with common secret redaction.
 - Environment-variable presence capture without raw values.
 - Fail-closed checks for secret-like command arguments, path traversal, and sensitive credential/config inputs.
-- ReproCapsule example fixture, tests, skill spec, and CI smoke gate.
+- `trustforge reprocapsule replay` integrity preflight and explicit `--execute` replay mode.
+- Replay expectations using exit code and optional literal failure signature.
+- Replay decisions: `ready`, `reproduced`, `diverged`, and `blocked`.
+- Integrity verification before execution, including packaged input and trace hashes/sizes.
+- Temporary replay workspace, bounded timeout, `shell=False`, and reduced environment inheritance.
+- Replay report JSON Schema plus CI gates for reproduction and tamper blocking.
 
 ### Changed
 
-- Development version advanced to `0.6.0.dev0`.
+- Development version advanced to `0.6.0.dev1`.
+
+### Security
+
+- Replay does not execute by default; `--execute` is required explicitly.
+- Tampered or missing packaged inputs block execution before the declared command starts.
+- Replay stdout/stderr are sanitized before being returned.
+- The temporary replay workspace is not claimed to be a security sandbox; untrusted capsules still require real OS/container isolation.
 
 ### Planned
 
-- ReproCapsule replay verification and integrity checks.
 - Docker/devcontainer export.
+- Sandboxed/containerized replay runner.
 - Adversarial trace-redaction fixtures.
+- Cross-platform dependency/environment lock capture.
 - FreshPlan async refresh adapters, runtime integrations, and persistent metadata state-store adapters.
 - Larger/more varied FreshPlan graph-shape benchmarks and domain-specific freshness-policy linting.
 - Larger multilingual/domain-specific DataLease benchmarks.
