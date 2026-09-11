@@ -5,8 +5,7 @@ import json
 import sys
 from pathlib import Path
 
-from .commitment_guard import render_text as render_commitments
-from .commitment_guard import verify_files
+from .commitment_guard import CommitmentGuardError, render_text as render_commitments, verify_files
 from .datalease import DataLeaseError, apply_files as apply_datalease, dumps as dump_datalease
 from .datalease_eval import (
     DataLeaseBenchmarkError,
@@ -35,10 +34,15 @@ def build_parser() -> argparse.ArgumentParser:
     diff.add_argument("--json", action="store_true", dest="as_json", help="Deprecated alias for --format json")
     diff.add_argument("--fail-on", choices=["low", "medium", "high"], default=None)
 
-    verify = sub.add_parser("verify", help="Verify commitments against an evidence JSON file")
+    verify = sub.add_parser("verify", help="Verify completion commitments against an evidence JSON file")
     verify.add_argument("contract")
     verify.add_argument("--evidence", required=True)
     verify.add_argument("--json", action="store_true", dest="as_json")
+    verify.add_argument(
+        "--accept-partial",
+        action="store_true",
+        help="Exit successfully when all required commitments pass/are waived even if optional commitments remain incomplete",
+    )
 
     datalease = sub.add_parser("datalease", help="Apply and evaluate purpose-bound data minimization policies")
     datalease_sub = datalease.add_subparsers(dest="datalease_command", required=True)
@@ -120,9 +124,17 @@ def main(argv: list[str] | None = None) -> int:
         print(dump_skilldiff(report) if output_format == "json" else dumps_sarif(report) if output_format == "sarif" else render_skilldiff(report))
         return 2 if args.fail_on and _risk_rank(report["risk"]["level"]) >= _risk_rank(args.fail_on) else 0
     if args.command == "verify":
-        report = verify_files(args.contract, args.evidence)
+        try:
+            report = verify_files(args.contract, args.evidence)
+        except CommitmentGuardError as exc:
+            print(f"CommitmentGuard error: {exc}", file=sys.stderr)
+            return 3
         print(json.dumps(report, indent=2, sort_keys=True) if args.as_json else render_commitments(report))
-        return 0 if report["verified_complete"] else 3
+        if report["verified_complete"]:
+            return 0
+        if args.accept_partial and report["completion_state"] == "partial" and report["required_satisfied"]:
+            return 0
+        return 3
     if args.command == "datalease" and args.datalease_command == "apply":
         try:
             report = apply_datalease(args.policy, args.input_path, args.purpose)
