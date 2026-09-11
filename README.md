@@ -62,9 +62,8 @@ TrustForge is being built around those questions.
           │                │                │
           └────────────────┼────────────────┘
                            │
-                   CommitmentGuard
-                           │
-                  evidence before "done"
+             CommitmentGuard + ReproCapsule
+                  proof + reproducibility
 ```
 
 | Primitive | What it does | Status |
@@ -73,7 +72,7 @@ TrustForge is being built around those questions.
 | **DataLease** | Sends only the minimum necessary data to approved destinations | Released |
 | **FreshPlan** | Detects aging evidence and re-plans only affected branches | **v0.5.0** |
 | **CommitmentGuard** | Requires evidence before completion claims | MVP |
-| **ReproCapsule** | Packages failures into reproducible environments | Next |
+| **ReproCapsule** | Packages failures into portable, sanitized reproduction artifacts | **v0.6 in development** |
 
 ## Who this is for
 
@@ -131,36 +130,47 @@ trustforge freshplan check \
 
 FreshPlan models facts as `fresh`, `refresh_due`, or `stale`. Only stale evidence invalidates dependent nodes, so unrelated branches stay valid.
 
-## FreshPlan v0.5.0
+### 4. Package a failure without packaging secrets
 
-The current release focuses on long-running plans that depend on time-sensitive evidence.
+```bash
+trustforge reprocapsule build \
+  --spec examples/reprocapsule/example-spec.yaml \
+  --output .artifacts/reprocapsule
+```
 
-FreshPlan supports:
+The v0.6 MVP writes a portable manifest, hashes/copies explicitly listed failing inputs, fingerprints the runtime environment, and sanitizes the supplied failure trace. Raw environment values are not copied, secret-like command arguments are rejected, and the build step does not execute the failing command.
 
-- provenance and freshness metadata;
-- TTL and explicit validity windows;
-- named freshness policies;
-- `fresh`, `refresh_due`, and `stale` states;
-- selective invalidation;
-- value-free refresh requests;
-- trusted refresh adapters;
-- explicit `changed | unchanged | unknown` replacement semantics;
-- minimal `blocked | replan | resume` patches;
-- deterministic large-graph performance regression tests.
+## ReproCapsule v0.6 development
 
-Example recovery flow:
+The current development line is focused on a problem that shows up constantly in coding-agent workflows: a failure happened on one machine, but the next developer or agent does not have enough trustworthy context to reproduce it.
+
+Current build flow:
 
 ```text
-stale fact
-    ↓
-refresh request
-    ↓
-replacement evidence
-    ↓
-changed / unchanged / unknown
-    ↓
-blocked / replan / resume
+failure context
+      ↓
+explicit build spec
+      ↓
+path + secret safety checks
+      ↓
+input hashes / safe copies
+      ↓
+sanitized trace
+      ↓
+environment fingerprint
+      ↓
+portable reprocapsule.json
 ```
+
+The MVP deliberately does **not** replay commands yet. Replay verification comes next, after integrity and safety checks are defined clearly.
+
+See [`skills/reprocapsule/SKILL.md`](skills/reprocapsule/SKILL.md) and [`ROADMAP.md`](ROADMAP.md).
+
+## FreshPlan v0.5.0
+
+The latest stable release focuses on long-running plans that depend on time-sensitive evidence.
+
+FreshPlan supports provenance and freshness metadata, TTL/validity windows, named freshness policies, selective invalidation, value-free refresh requests, trusted refresh adapters, replacement semantics, minimal plan patches, and deterministic large-graph regression tests.
 
 Release notes: [`docs/releases/v0.5.0.md`](docs/releases/v0.5.0.md)
 
@@ -188,6 +198,7 @@ This project is intentionally conservative about claims.
 - Freshness policies cannot prove that a domain-specific TTL is correct.
 - Static capability detection cannot prove runtime behavior.
 - Redaction reduces disclosure but does not automatically make data anonymous.
+- ReproCapsule trace sanitization is a defensive baseline, not a proof that arbitrary secrets can never appear.
 
 The goal is useful infrastructure with measurable boundaries, not perfect detection or novelty marketing.
 
@@ -197,7 +208,7 @@ TrustForge is still pre-1.0 and is being developed in the open.
 
 The repository includes the implementation, eval fixtures, known limitations, release checklists, benchmark gates, and design tradeoffs as they evolve.
 
-The next planned milestone is **ReproCapsule v0.6**, focused on turning agent failures into portable, sanitized reproduction bundles.
+The active milestone is **ReproCapsule v0.6**. The first MVP packages failure metadata safely; replay verification and container/devcontainer export are next.
 
 If you are working on agent infrastructure, feedback is useful even if the answer is "this would not fit my stack." Open an issue with a concrete workflow or failure mode.
 
@@ -226,7 +237,7 @@ If you are working on agent infrastructure, feedback is useful even if the answe
 
 ## Release and compatibility
 
-- Current package version: **0.5.0**
+- Development package version on `main`: **0.6.0.dev0**
 - Latest stable release: **v0.5.0**
 - Floating stable GitHub Action ref: **`v0`**
 - License: Apache-2.0
