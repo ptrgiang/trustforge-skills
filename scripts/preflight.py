@@ -171,7 +171,8 @@ def main() -> int:
             raise RuntimeError("CommitmentGuard GitHub Actions provenance unexpectedly contains a token field")
 
     with tempfile.TemporaryDirectory() as evidence_tmp:
-        artifact = Path(evidence_tmp) / "coverage.json"
+        evidence_tmp_path = Path(evidence_tmp)
+        artifact = evidence_tmp_path / "coverage.json"
         artifact.write_text('{"totals":{"percent":94.5}}\n', encoding="utf-8")
         artifact_evidence = subprocess.check_output(
             [
@@ -198,6 +199,58 @@ def main() -> int:
             raise RuntimeError("CommitmentGuard artifact adapter extracted the wrong value")
         if artifact_observation["source"]["kind"] != "artifact" or len(artifact_observation["source"]["sha256"]) != 64:
             raise RuntimeError("CommitmentGuard artifact adapter provenance mismatch")
+
+        manifest_evidence = subprocess.check_output(
+            [
+                python,
+                "-m",
+                "trustforge.cli",
+                "evidence",
+                "package-manifest",
+                "--input",
+                "pyproject.toml",
+                "--observed-at",
+                "2026-09-11T15:20:00Z",
+            ],
+            cwd=ROOT,
+            text=True,
+        )
+        manifest_bundle = json.loads(manifest_evidence)
+        manifest_observation = manifest_bundle["observations"]["dependencies.manifest_sha256"]
+        if len(manifest_observation["value"]) != 64:
+            raise RuntimeError("CommitmentGuard package-manifest adapter did not emit a SHA-256 value")
+        if manifest_observation["source"]["kind"] != "package-manifest":
+            raise RuntimeError("CommitmentGuard package-manifest source kind mismatch")
+
+        before_api = evidence_tmp_path / "api-before.json"
+        after_api = evidence_tmp_path / "api-after.json"
+        before_api.write_text('{"paths":{"/users":{"get":{}}}}', encoding="utf-8")
+        after_api.write_text('{"paths":{"/users":{"get":{}},"/health":{"get":{}}}}', encoding="utf-8")
+        api_evidence = subprocess.check_output(
+            [
+                python,
+                "-m",
+                "trustforge.cli",
+                "evidence",
+                "api-diff",
+                "--before",
+                str(before_api),
+                "--after",
+                str(after_api),
+                "--observed-at",
+                "2026-09-11T15:20:00Z",
+            ],
+            cwd=ROOT,
+            text=True,
+        )
+        api_bundle = json.loads(api_evidence)
+        api_observation = api_bundle["observations"]["api.no_removed_operations"]
+        if api_observation["value"] is not True:
+            raise RuntimeError("CommitmentGuard API diff adapter incorrectly reported an additive change")
+        if api_observation["source"]["removed_operation_count"] != 0:
+            raise RuntimeError("CommitmentGuard API diff removed-operation count mismatch")
+        if "/users" in api_evidence or "/health" in api_evidence:
+            raise RuntimeError("CommitmentGuard API diff evidence unexpectedly copied endpoint names")
 
     run(
         python,
