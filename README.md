@@ -13,13 +13,13 @@ The project starts from a simple observation: as agent ecosystems grow, the hard
 - Is the plan still valid after external facts changed?
 - Can a failure be reproduced by another developer?
 
-TrustForge turns those questions into reusable skills, contracts, evidence, and evals.
+TrustForge turns those questions into reusable skills, contracts, evidence, evals, and CI gates.
 
 ## Current focus
 
 | Skill | Purpose | Status |
 | --- | --- | --- |
-| **SkillDiff** | Detect trust-boundary changes between skill versions | **v0.2 flagship** |
+| **SkillDiff** | Detect trust-boundary changes between skill versions | **v0.3 flagship** |
 | **CommitmentGuard** | Require evidence for user constraints before an agent can claim completion | MVP |
 | **DataLease** | Minimize and gate data shared with tools/APIs | Planned |
 | **FreshPlan** | Invalidate plan nodes when facts become stale | Planned |
@@ -29,12 +29,14 @@ TrustForge turns those questions into reusable skills, contracts, evidence, and 
 
 A normal file diff answers **what text changed**. SkillDiff tries to answer **what trust assumptions changed**.
 
-It currently checks:
+The v0.3 pipeline combines lexical scanning with Python AST analysis:
 
 ```text
 files
   ↓
-capabilities + evidence locations
+lexical capability scan + evidence locations
+  ↓
+Python AST capability scan
   ↓
 network domains + dependencies
   ↓
@@ -44,23 +46,21 @@ SKILL.md trigger-scope expansion
   ↓
 declared vs observed capability manifest
   ↓
-risk explanations + JSON/SARIF
+risk explanations + JSON/SARIF + CI gate
 ```
 
-Example:
+The AST layer resolves aliases and call structure instead of merely matching suspicious text. For example, it can distinguish a string containing `subprocess.run(...)` from an actual aliased call such as `import subprocess as sp; sp.run(...)`.
 
-```text
-TrustForge SkillDiff
-====================
-Risk: HIGH
+Current Python AST detectors cover:
 
-Why:
-  - New capabilities detected: environment_read, network, subprocess.
-  - New dependency detected: httpx.
-  - New secret-like environment reference detected: API_TOKEN.
-  - Skill trigger scope appears to have expanded.
-  - Observed capabilities are missing from the declared manifest.
-```
+- network clients such as `requests`, `httpx`, `urllib.request`, `socket`, and `aiohttp`;
+- subprocess execution, including imported aliases;
+- environment-variable reads and secret-like env names;
+- `open()` read/write mode;
+- common filesystem read/write and mutation calls;
+- dynamic execution via `eval`, `exec`, and `compile`.
+
+SkillDiff remains a static review tool, **not** a malware detector. A clean report is not proof that a candidate is safe.
 
 ## Quick start
 
@@ -89,11 +89,56 @@ Use it as a CI gate:
 trustforge skilldiff ./before-skill ./after-skill --fail-on medium
 ```
 
-Run CommitmentGuard:
+## GitHub Action
+
+TrustForge now ships a composite GitHub Action from the repository root.
+
+Until a stable tag is published, pin the action to a commit SHA or use `@main` for evaluation:
+
+```yaml
+name: Skill trust check
+
+on:
+  pull_request:
+
+jobs:
+  skilldiff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ptrgiang/trustforge-skills@main
+        with:
+          before: fixtures/trusted-skill
+          after: skills/candidate-skill
+          fail-on: medium
+          format: sarif
+          report-path: artifacts/skilldiff.sarif
+```
+
+Action inputs:
+
+- `before` — trusted/baseline skill directory;
+- `after` — candidate skill directory;
+- `fail-on` — optional `low`, `medium`, or `high` threshold;
+- `format` — `text`, `json`, or `sarif`;
+- `report-path` — optional file to receive the report;
+- `python-version` — defaults to Python 3.12.
+
+For production use, prefer a release tag or immutable commit SHA rather than a moving branch.
+
+## Adversarial evals
+
+Two small eval families live under `evals/skilldiff/`:
+
+- `trigger-expansion` exercises trigger broadening, new domains, dependencies, secret references, and manifest mismatch;
+- `python-ast-alias` deliberately places a dangerous-looking call inside a harmless string in the baseline, then introduces real aliased network/subprocess/env/file-write calls in the candidate.
+
+Run the AST eval:
 
 ```bash
-trustforge verify examples/refactor-contract.json \
-  --evidence examples/refactor-evidence.json
+trustforge skilldiff \
+  evals/skilldiff/python-ast-alias/before \
+  evals/skilldiff/python-ast-alias/after
 ```
 
 ## Capability manifests
@@ -106,7 +151,16 @@ A skill can declare expected capabilities in `trustforge.json`:
 }
 ```
 
-SkillDiff compares the declaration with capabilities observed by the static scanner and surfaces mismatches for review.
+SkillDiff compares the declaration with capabilities observed by the static scanners and surfaces mismatches for review.
+
+## CommitmentGuard
+
+```bash
+trustforge verify examples/refactor-contract.json \
+  --evidence examples/refactor-evidence.json
+```
+
+CommitmentGuard blocks a verified-complete result while required evidence remains `FAIL` or `UNKNOWN`, unless a commitment has an explicit waiver.
 
 ## Core idea
 
@@ -138,10 +192,14 @@ Can we reproduce the failure?
 
 ```text
 trustforge-skills/
+├── action.yml
 ├── skills/
 │   ├── skilldiff/
 │   └── commitment-guard/
 ├── trustforge/
+│   ├── ast_detectors.py
+│   ├── skilldiff.py
+│   └── skilldiff_v03.py
 ├── contracts/
 ├── examples/
 ├── evals/
@@ -149,24 +207,13 @@ trustforge-skills/
 └── .github/workflows/
 ```
 
-## What makes a TrustForge skill?
-
-A TrustForge skill should define:
-
-- a narrow trust/reliability problem;
-- explicit inputs and outputs;
-- capabilities and side effects;
-- machine-checkable evidence where possible;
-- failure modes and refusal conditions;
-- eval cases demonstrating both success and failure.
-
 ## Roadmap
 
 See [`ROADMAP.md`](ROADMAP.md).
 
 ## Contributing
 
-Contributions are especially welcome for adversarial SkillDiff evals, new language detectors, agent-runtime integrations, and prior-art references. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Contributions are especially welcome for adversarial SkillDiff evals, language-aware detectors, GitHub Action integrations, agent-runtime integrations, and prior-art references. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Security
 
