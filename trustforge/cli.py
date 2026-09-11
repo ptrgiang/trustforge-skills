@@ -7,9 +7,11 @@ from pathlib import Path
 
 from .commitment_evidence import (
     CommitmentEvidenceError,
+    collect_api_diff,
     collect_command_exit,
     collect_github_actions,
     collect_json_artifact,
+    collect_package_manifest,
     collect_pytest,
     dumps as dump_commitment_evidence,
 )
@@ -78,6 +80,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Explicit workflow/job conclusion to map to boolean evidence",
     )
     evidence_github.add_argument("--observed-at", default=None, help="Optional deterministic ISO-8601 observation time")
+    evidence_manifest = evidence_sub.add_parser("package-manifest", help="Hash a package/dependency manifest as exact-snapshot evidence")
+    evidence_manifest.add_argument("--key", default="dependencies.manifest_sha256", help="Observation key to write")
+    evidence_manifest.add_argument("--input", required=True, dest="input_path", help="Package/dependency manifest path")
+    evidence_manifest.add_argument("--observed-at", default=None, help="Optional deterministic ISO-8601 observation time")
+    evidence_api_diff = evidence_sub.add_parser("api-diff", help="Check OpenAPI path+method removals between JSON documents")
+    evidence_api_diff.add_argument("--key", default="api.no_removed_operations", help="Observation key to write")
+    evidence_api_diff.add_argument("--before", required=True, dest="before_path", help="Before OpenAPI JSON document")
+    evidence_api_diff.add_argument("--after", required=True, dest="after_path", help="After OpenAPI JSON document")
+    evidence_api_diff.add_argument("--observed-at", default=None, help="Optional deterministic ISO-8601 observation time")
     evidence_json = evidence_sub.add_parser("json-artifact", help="Extract one value from a JSON artifact with hash provenance")
     evidence_json.add_argument("--key", required=True, help="Observation key to write")
     evidence_json.add_argument("--input", required=True, dest="input_path", help="JSON artifact path")
@@ -213,6 +224,31 @@ def main(argv: list[str] | None = None) -> int:
             bundle = collect_github_actions(
                 args.key,
                 args.conclusion,
+                observed_at=args.observed_at,
+            )
+        except CommitmentEvidenceError as exc:
+            print(f"Commitment evidence error: {exc}", file=sys.stderr)
+            return 8
+        print(dump_commitment_evidence(bundle))
+        return 0
+    if args.command == "evidence" and args.evidence_command == "package-manifest":
+        try:
+            bundle = collect_package_manifest(
+                args.key,
+                args.input_path,
+                observed_at=args.observed_at,
+            )
+        except CommitmentEvidenceError as exc:
+            print(f"Commitment evidence error: {exc}", file=sys.stderr)
+            return 8
+        print(dump_commitment_evidence(bundle))
+        return 0
+    if args.command == "evidence" and args.evidence_command == "api-diff":
+        try:
+            bundle = collect_api_diff(
+                args.key,
+                args.before_path,
+                args.after_path,
                 observed_at=args.observed_at,
             )
         except CommitmentEvidenceError as exc:
