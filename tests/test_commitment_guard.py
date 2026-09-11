@@ -254,6 +254,22 @@ class CommitmentGuardV07Tests(unittest.TestCase):
 
         self.assertTrue(report["verified_complete"])
 
+    def test_observation_bundle_requires_v02_schema_version(self):
+        contract = {
+            "schema_version": "0.2",
+            "commitments": [
+                {"id": "C1", "description": "Tests pass", "evidence": {"key": "tests.passed", "truthy": True}}
+            ],
+        }
+        with self.assertRaises(CommitmentGuardError):
+            verify(contract, {"observations": {"tests.passed": {"value": True}}}, as_of="2026-09-11T14:00:00Z")
+        with self.assertRaises(CommitmentGuardError):
+            verify(
+                contract,
+                {"schema_version": "0.1", "observations": {"tests.passed": {"value": True}}},
+                as_of="2026-09-11T14:00:00Z",
+            )
+
     def test_duplicate_commitment_ids_fail_closed(self):
         contract = {
             "schema_version": "0.2",
