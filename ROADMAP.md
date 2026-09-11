@@ -197,9 +197,33 @@ Evidence-backed completion contracts for autonomous agents.
 - [x] Run final CI/release-candidate matrix
 - [x] Release `v0.7.0` and advance stable `v0`
 
+## v0.8 — Signed evidence attestations
+
+Cryptographic binding between an evidence observation, its provenance metadata, and an explicitly trusted signer identity.
+
+- [x] Ed25519 attestation schema v0.1
+- [x] Canonical JSON hashing for evidence value and provenance
+- [x] Bind observation key, issuer, key ID, issue time, and optional expiry into the signed payload
+- [x] Fail-closed tamper, invalid-signature, unknown-key, future-issued, and expired-attestation handling
+- [x] Commitment policy fields `require_attestation`, `allowed_attestation_issuers`, and `allowed_attestation_key_ids`
+- [x] External trust registry mapping `(issuer, key_id)` to Ed25519 public keys
+- [x] Keep trust material outside the completion contract
+- [x] CLI `trustforge evidence sign`
+- [x] CLI `trustforge evidence verify-attestation`
+- [x] Full `trustforge verify --trust-registry` integration
+- [x] Verification report metadata without echoing signatures
+- [x] Signed-evidence adversarial fixture and regression tests
+- [x] Trust-registry path confinement against absolute/parent-directory escapes
+- [x] Dedicated trust-model documentation
+- [x] Finalize package/runtime version to `0.8.0`
+- [x] Freeze v0.8 release scope and security boundaries
+- [ ] Run final CI/release-candidate matrix
+- [ ] Release `v0.8.0` and advance stable `v0`
+
 ### CommitmentGuard research backlog
 
-- [ ] Signed evidence attestations
+- [ ] Cloud KMS/HSM signing adapters and remote signing
+- [ ] Key revocation/distribution mechanisms and transparency logs
 - [ ] Natural-language commitment extraction
 - [ ] Browser-task evidence adapters
 - [ ] Richer API compatibility analysis
