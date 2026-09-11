@@ -44,21 +44,23 @@ def _argv_fingerprint(command: Sequence[str]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def collect_command_exit(
-    key: str,
-    command: Sequence[str],
-    *,
-    observed_at: str | None = None,
-    timeout_seconds: float = 30.0,
-    runner: Callable[..., subprocess.CompletedProcess[Any]] = subprocess.run,
-) -> dict[str, Any]:
+def _validate_command(command: Sequence[str], timeout_seconds: float) -> None:
     if not command or not all(isinstance(part, str) and part for part in command):
         raise CommitmentEvidenceError("command must be a non-empty sequence of strings")
     if timeout_seconds <= 0 or timeout_seconds > 300:
         raise CommitmentEvidenceError("timeout_seconds must be greater than 0 and at most 300")
 
+
+def _run_exit(
+    command: Sequence[str],
+    *,
+    timeout_seconds: float,
+    runner: Callable[..., subprocess.CompletedProcess[Any]],
+    label: str,
+) -> subprocess.CompletedProcess[Any]:
+    _validate_command(command, timeout_seconds)
     try:
-        completed = runner(
+        return runner(
             list(command),
             shell=False,
             stdout=subprocess.DEVNULL,
@@ -67,8 +69,18 @@ def collect_command_exit(
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        raise CommitmentEvidenceError(f"command evidence collection failed: {exc}") from exc
+        raise CommitmentEvidenceError(f"{label} evidence collection failed: {exc}") from exc
 
+
+def collect_command_exit(
+    key: str,
+    command: Sequence[str],
+    *,
+    observed_at: str | None = None,
+    timeout_seconds: float = 30.0,
+    runner: Callable[..., subprocess.CompletedProcess[Any]] = subprocess.run,
+) -> dict[str, Any]:
+    completed = _run_exit(command, timeout_seconds=timeout_seconds, runner=runner, label="command")
     return _bundle(
         key,
         completed.returncode == 0,
@@ -77,6 +89,38 @@ def collect_command_exit(
             "kind": "command",
             "executable": command[0],
             "argument_count": max(len(command) - 1, 0),
+            "argv_sha256": _argv_fingerprint(command),
+            "exit_code": completed.returncode,
+            "stdout_captured": False,
+            "stderr_captured": False,
+        },
+    )
+
+
+def collect_pytest(
+    key: str,
+    pytest_args: Sequence[str] = (),
+    *,
+    python_executable: str = "python",
+    observed_at: str | None = None,
+    timeout_seconds: float = 120.0,
+    runner: Callable[..., subprocess.CompletedProcess[Any]] = subprocess.run,
+) -> dict[str, Any]:
+    if not isinstance(python_executable, str) or not python_executable:
+        raise CommitmentEvidenceError("python_executable must be a non-empty string")
+    if not all(isinstance(part, str) and part for part in pytest_args):
+        raise CommitmentEvidenceError("pytest_args must contain only non-empty strings")
+
+    command = [python_executable, "-m", "pytest", *pytest_args]
+    completed = _run_exit(command, timeout_seconds=timeout_seconds, runner=runner, label="pytest")
+    return _bundle(
+        key,
+        completed.returncode == 0,
+        _observed_at(observed_at),
+        {
+            "kind": "pytest",
+            "python_executable": python_executable,
+            "argument_count": len(pytest_args),
             "argv_sha256": _argv_fingerprint(command),
             "exit_code": completed.returncode,
             "stdout_captured": False,
