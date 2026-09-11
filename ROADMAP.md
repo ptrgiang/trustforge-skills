@@ -146,8 +146,8 @@ Portable failure reproduction for coding agents and autonomous debugging workflo
 - [x] Freeze bundled release redaction fixture at 1.0 recall / 1.0 specificity
 - [x] Prepare v0.6.0 release notes and checklist
 - [x] Finalize package/runtime version to `0.6.0`
-- [ ] Run final CI/release-candidate matrix
-- [ ] Release `v0.6.0` and advance stable `v0`
+- [x] Run final CI/release-candidate matrix
+- [x] Release `v0.6.0` and advance stable `v0`
 
 ### ReproCapsule research backlog
 
