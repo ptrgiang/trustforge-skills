@@ -55,29 +55,31 @@ The v0.1 registry maps an `(issuer, key_id)` identity to an Ed25519 public-key P
 }
 ```
 
+`public_key_file` must be a relative path and must resolve inside the directory containing the registry. Absolute paths and `..` escapes fail closed.
+
 Only public verification material belongs in the trust registry. Private signing keys must remain outside the repository and outside evidence bundles.
 
 ## CLI flow
 
-Sign one observation in an evidence bundle:
+Sign one observation in an evidence bundle. The signed bundle is written to stdout, so redirect it to a file when needed:
 
 ```bash
 trustforge evidence sign \
-  --evidence evidence.json \
+  --input evidence.json \
   --key ci.passed \
   --private-key signer.pem \
   --issuer release-ci \
   --key-id 2026-09 \
   --issued-at 2026-09-11T16:01:00Z \
   --expires-at 2026-09-12T16:01:00Z \
-  --output signed-evidence.json
+  > signed-evidence.json
 ```
 
 Verify only the attestation:
 
 ```bash
 trustforge evidence verify-attestation \
-  --evidence signed-evidence.json \
+  --input signed-evidence.json \
   --key ci.passed \
   --trust-registry trust-registry.json \
   --as-of 2026-09-11T16:30:00Z
@@ -116,4 +118,4 @@ For production use, keep signing keys in a dedicated secret/KMS system, distribu
 
 `evals/commitmentguard/signed-attestation/` contains a synthetic public key, trust registry, contract, and signed evidence fixture. The private key used to create the fixture is not stored in the repository.
 
-Tests cover valid signed evidence plus tampered values, expiry, and issuer-policy mismatch. These tests are regression evidence, not a cryptographic audit or compliance certification.
+Tests cover valid signed evidence plus tampered values, expiry, issuer-policy mismatch, and trust-registry path escapes. These tests are regression evidence, not a cryptographic audit or compliance certification.
