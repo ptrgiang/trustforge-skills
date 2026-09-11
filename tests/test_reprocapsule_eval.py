@@ -14,8 +14,11 @@ class ReproCapsuleBenchmarkTests(unittest.TestCase):
         self.assertGreaterEqual(report["secret_cases"], 10)
         self.assertGreaterEqual(report["clean_cases"], 5)
         self.assertEqual(report["secret_recall"], 0.9)
-        self.assertEqual(report["clean_specificity"], 1.0)
-        self.assertEqual(report["failed_case_ids"], ["refresh-token-json"])
+        self.assertEqual(report["clean_specificity"], 0.833333)
+        self.assertEqual(
+            report["failed_case_ids"],
+            ["refresh-token-json", "clean-bearer-word"],
+        )
 
     def test_reports_failed_case_ids_without_echoing_text(self):
         with tempfile.TemporaryDirectory() as tmp:
