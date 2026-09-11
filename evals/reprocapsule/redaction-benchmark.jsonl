@@ -1,0 +1,16 @@
+{"id":"api-key-assignment","text":"API_KEY=synthetic-key-1234567890","secret_markers":["synthetic-key-1234567890"],"preserve_markers":["API_KEY"]}
+{"id":"password-colon","text":"password: horse-battery-staple","secret_markers":["horse-battery-staple"],"preserve_markers":["password"]}
+{"id":"authorization-bearer","text":"Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.synthetic.signature","secret_markers":["eyJhbGciOiJIUzI1NiJ9.synthetic.signature"],"preserve_markers":["Authorization"]}
+{"id":"github-pat","text":"request failed with token ghp_abcdefghijklmnopqrstuvwxyz1234567890","secret_markers":["ghp_abcdefghijklmnopqrstuvwxyz1234567890"],"preserve_markers":["request failed with token"]}
+{"id":"openai-style-token","text":"client token sk-abcdefghijklmnopqrstuvwxyz1234567890","secret_markers":["sk-abcdefghijklmnopqrstuvwxyz1234567890"],"preserve_markers":["client token"]}
+{"id":"aws-access-key","text":"credential AKIAIOSFODNN7EXAMPLE was rejected","secret_markers":["AKIAIOSFODNN7EXAMPLE"],"preserve_markers":["credential","was rejected"]}
+{"id":"refresh-token-json","text":"{\"refresh_token\": \"refresh-synthetic-987654321\", \"status\": \"failed\"}","secret_markers":["refresh-synthetic-987654321"],"preserve_markers":["refresh_token","status"]}
+{"id":"private-key-assignment","text":"private_key=synthetic-private-material","secret_markers":["synthetic-private-material"],"preserve_markers":["private_key"]}
+{"id":"multiline-mixed","text":"trace start\nAPI_KEY=multiline-secret-abc\nstatus=500\nAuthorization: Bearer multiline.token.value\ntrace end","secret_markers":["multiline-secret-abc","multiline.token.value"],"preserve_markers":["trace start","status=500","trace end"]}
+{"id":"case-insensitive-secret","text":"Access_Token=CaseSensitiveValue123","secret_markers":["CaseSensitiveValue123"],"preserve_markers":["Access_Token"]}
+{"id":"clean-password-policy","text":"password policy validation failed after 3 attempts","secret_markers":[],"preserve_markers":["password policy validation failed after 3 attempts"]}
+{"id":"clean-secret-word","text":"secret scanning is enabled for this repository","secret_markers":[],"preserve_markers":["secret scanning is enabled for this repository"]}
+{"id":"clean-api-key-docs","text":"The api_key field is required but no value was supplied","secret_markers":[],"preserve_markers":["The api_key field is required but no value was supplied"]}
+{"id":"clean-bearer-word","text":"Bearer authentication should be configured by the caller","secret_markers":[],"preserve_markers":["Bearer authentication should be configured by the caller"]}
+{"id":"clean-aws-looking-short","text":"AWS key prefix AKIA is documented here","secret_markers":[],"preserve_markers":["AWS key prefix AKIA is documented here"]}
+{"id":"clean-github-prefix","text":"GitHub tokens often begin with ghp_ but this is documentation","secret_markers":[],"preserve_markers":["GitHub tokens often begin with ghp_ but this is documentation"]}
