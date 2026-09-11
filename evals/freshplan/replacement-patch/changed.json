@@ -1,0 +1,16 @@
+{
+  "version": "0.1",
+  "replacements": [
+    {
+      "fact_id": "inventory",
+      "evidence_id": "sp-api:inventory:20260911T0929Z",
+      "observed_at": "2026-09-11T09:29:00Z",
+      "ttl_seconds": 900,
+      "provenance": {
+        "source": "sp-api",
+        "reference": "inventory-summary:refresh-2"
+      },
+      "change": "changed"
+    }
+  ]
+}

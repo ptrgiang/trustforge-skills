@@ -1,0 +1,37 @@
+version: "0.1"
+plan_id: order-refresh-eval
+description: Selective refresh and minimal re-plan fixture.
+
+facts:
+  - id: inventory
+    observed_at: "2026-09-11T09:00:00Z"
+    ttl_seconds: 900
+    provenance:
+      source: sp-api
+      reference: inventory-summary
+    refresh:
+      adapter: inventory-api
+      reference: inventory:SKU-1
+
+  - id: fx
+    observed_at: "2026-09-11T09:20:00Z"
+    ttl_seconds: 3600
+    provenance:
+      source: fx-api
+      reference: USD-VND
+
+nodes:
+  - id: reorder
+    title: Recompute reorder recommendation
+    depends_on:
+      facts: [inventory]
+
+  - id: purchase
+    title: Prepare purchase order
+    depends_on:
+      nodes: [reorder]
+
+  - id: price
+    title: Localize price
+    depends_on:
+      facts: [fx]

@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ptrgiang/trustforge-skills/contracts/freshplan-patch.schema.json",
+  "title": "TrustForge FreshPlan Plan Patch",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "as_of",
+    "decision",
+    "summary",
+    "replacements",
+    "before",
+    "after",
+    "operations",
+    "blocked_nodes",
+    "replan_order",
+    "resume_nodes",
+    "unaffected_nodes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "as_of": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "decision": {
+      "enum": [
+        "blocked",
+        "replan_required",
+        "resumable",
+        "no_change"
+      ]
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "replacements",
+        "blocked_nodes",
+        "replan_nodes",
+        "resume_nodes",
+        "unaffected_nodes"
+      ],
+      "properties": {
+        "replacements": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blocked_nodes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "replan_nodes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "resume_nodes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unaffected_nodes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "replacements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fact_id",
+          "evidence_id",
+          "change",
+          "observed_at",
+          "provenance"
+        ],
+        "properties": {
+          "fact_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "change": {
+            "enum": [
+              "changed",
+              "unchanged",
+              "unknown"
+            ]
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source"
+            ],
+            "properties": {
+              "source": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reference": {
+                "type": "string"
+              },
+              "observed_by": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "before": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stale_facts",
+        "invalidated_nodes"
+      ],
+      "properties": {
+        "stale_facts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "invalidated_nodes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "after": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stale_facts",
+        "invalidated_nodes"
+      ],
+      "properties": {
+        "stale_facts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "invalidated_nodes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "op",
+          "node_id",
+          "root_facts",
+          "reason"
+        ],
+        "properties": {
+          "op": {
+            "enum": [
+              "blocked",
+              "replan",
+              "resume"
+            ]
+          },
+          "node_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "root_facts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "blocked_nodes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "replan_order": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "resume_nodes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "unaffected_nodes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

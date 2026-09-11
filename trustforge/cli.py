@@ -20,6 +20,14 @@ from .freshplan import (
     evaluate_file as evaluate_freshplan,
     render_text as render_freshplan,
 )
+from .freshplan_refresh import (
+    FreshPlanRefreshError,
+    build_plan_patch_file,
+    build_refresh_requests_file,
+    dumps as dump_freshplan_refresh,
+    render_patch_text,
+    render_requests_text,
+)
 from .skilldiff_v03 import compare, dumps as dump_skilldiff, dumps_sarif, render_text as render_skilldiff
 
 
@@ -71,8 +79,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Exit 5 when micro recall is below this threshold",
     )
 
-    freshplan = sub.add_parser("freshplan", help="Evaluate freshness-aware dependency graphs")
+    freshplan = sub.add_parser("freshplan", help="Evaluate and refresh freshness-aware dependency graphs")
     freshplan_sub = freshplan.add_subparsers(dest="freshplan_command", required=True)
+
     freshplan_check = freshplan_sub.add_parser(
         "check",
         help="Find stale facts and selectively invalidate dependent plan nodes",
@@ -88,6 +97,32 @@ def build_parser() -> argparse.ArgumentParser:
         "--fail-on-stale",
         action="store_true",
         help="Exit 6 when stale facts invalidate one or more plan nodes",
+    )
+
+    freshplan_requests = freshplan_sub.add_parser(
+        "requests",
+        help="Emit value-free refresh requests for stale facts",
+    )
+    freshplan_requests.add_argument("--plan", required=True, help="Path to a FreshPlan JSON/YAML document")
+    freshplan_requests.add_argument("--as-of", default=None, help="ISO-8601 evaluation time")
+    freshplan_requests.add_argument("--json", action="store_true", dest="as_json")
+
+    freshplan_patch = freshplan_sub.add_parser(
+        "patch",
+        help="Apply replacement evidence metadata and emit the minimal control-plane plan patch",
+    )
+    freshplan_patch.add_argument("--plan", required=True, help="Path to a FreshPlan JSON/YAML document")
+    freshplan_patch.add_argument(
+        "--evidence",
+        required=True,
+        help="Path to FreshPlan replacement evidence JSON/YAML",
+    )
+    freshplan_patch.add_argument("--as-of", default=None, help="ISO-8601 evaluation time")
+    freshplan_patch.add_argument("--json", action="store_true", dest="as_json")
+    freshplan_patch.add_argument(
+        "--fail-on-replan",
+        action="store_true",
+        help="Exit 6 when the patch is blocked or requires re-planning",
     )
 
     return parser
@@ -169,6 +204,28 @@ def main(argv: list[str] | None = None) -> int:
 
         print(dump_freshplan(report) if args.as_json else render_freshplan(report))
         if args.fail_on_stale and report["decision"] == "replan_required":
+            return 6
+        return 0
+
+    if args.command == "freshplan" and args.freshplan_command == "requests":
+        try:
+            report = build_refresh_requests_file(args.plan, as_of=args.as_of)
+        except (FreshPlanRefreshError, FreshPlanError, OSError, json.JSONDecodeError) as exc:
+            print(f"FreshPlan refresh error: {exc}", file=sys.stderr)
+            return 6
+
+        print(dump_freshplan_refresh(report) if args.as_json else render_requests_text(report))
+        return 0
+
+    if args.command == "freshplan" and args.freshplan_command == "patch":
+        try:
+            report = build_plan_patch_file(args.plan, args.evidence, as_of=args.as_of)
+        except (FreshPlanRefreshError, FreshPlanError, OSError, json.JSONDecodeError) as exc:
+            print(f"FreshPlan refresh error: {exc}", file=sys.stderr)
+            return 6
+
+        print(dump_freshplan_refresh(report) if args.as_json else render_patch_text(report))
+        if args.fail_on_replan and report["decision"] in {"blocked", "replan_required"}:
             return 6
         return 0
 

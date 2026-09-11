@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ptrgiang/trustforge-skills/contracts/freshplan-refresh-request.schema.json",
+  "title": "TrustForge FreshPlan Refresh Request Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "as_of",
+    "decision",
+    "summary",
+    "requests"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "as_of": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "decision": {
+      "enum": [
+        "fresh",
+        "refresh_required"
+      ]
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stale_facts",
+        "configured_requests",
+        "unconfigured_requests"
+      ],
+      "properties": {
+        "stale_facts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "configured_requests": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unconfigured_requests": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "requests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fact_id",
+          "configured",
+          "adapter",
+          "reference",
+          "reason",
+          "as_of",
+          "current"
+        ],
+        "properties": {
+          "fact_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "adapter": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "current": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "observed_at",
+              "expires_at",
+              "provenance"
+            ],
+            "properties": {
+              "observed_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "expires_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "provenance": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "source"
+                ],
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reference": {
+                    "type": "string"
+                  },
+                  "observed_by": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

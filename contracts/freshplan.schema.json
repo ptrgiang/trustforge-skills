@@ -77,6 +77,22 @@
                 "type": "string"
               }
             }
+          },
+          "refresh": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "adapter"
+            ],
+            "properties": {
+              "adapter": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reference": {
+                "type": "string"
+              }
+            }
           }
         }
       }

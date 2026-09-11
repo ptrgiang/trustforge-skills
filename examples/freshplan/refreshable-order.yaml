@@ -1,0 +1,34 @@
+version: "0.1"
+plan_id: order-refresh-example
+description: Refreshable inventory branch with an independent FX branch.
+
+facts:
+  - id: inventory
+    observed_at: "2026-09-11T09:00:00Z"
+    ttl_seconds: 900
+    provenance:
+      source: sp-api
+      reference: inventory-summary
+    refresh:
+      adapter: inventory-api
+      reference: inventory:SKU-1
+
+  - id: fx
+    observed_at: "2026-09-11T09:20:00Z"
+    ttl_seconds: 3600
+    provenance:
+      source: fx-api
+      reference: USD-VND
+
+nodes:
+  - id: reorder
+    depends_on:
+      facts: [inventory]
+
+  - id: purchase
+    depends_on:
+      nodes: [reorder]
+
+  - id: price
+    depends_on:
+      facts: [fx]

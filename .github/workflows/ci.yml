@@ -96,6 +96,64 @@ jobs:
           status=$?
           set -e
           test "$status" -eq 6
+      - name: FreshPlan refresh request smoke test
+        run: |
+          trustforge freshplan requests \
+            --plan evals/freshplan/replacement-patch/plan.yaml \
+            --as-of "2026-09-11T09:30:00Z" \
+            --json > .artifacts/freshplan-requests.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path(".artifacts/freshplan-requests.json").read_text())
+          assert report["decision"] == "refresh_required"
+          assert report["summary"]["configured_requests"] == 1
+          assert report["requests"][0]["fact_id"] == "inventory"
+          assert report["requests"][0]["adapter"] == "inventory-api"
+          print("FreshPlan refresh request smoke test passed")
+          PY
+      - name: FreshPlan replacement patch smoke test
+        run: |
+          trustforge freshplan patch \
+            --plan evals/freshplan/replacement-patch/plan.yaml \
+            --evidence evals/freshplan/replacement-patch/changed.json \
+            --as-of "2026-09-11T09:30:00Z" \
+            --json > .artifacts/freshplan-patch.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path(".artifacts/freshplan-patch.json").read_text())
+          assert report["decision"] == "replan_required"
+          assert report["replan_order"] == ["reorder", "purchase"]
+          assert report["unaffected_nodes"] == ["price"]
+          assert [op["op"] for op in report["operations"]] == ["replan", "replan"]
+          print("FreshPlan replacement patch smoke test passed")
+          PY
+      - name: FreshPlan adapter smoke test
+        run: |
+          python examples/freshplan/adapter_demo.py > .artifacts/freshplan-adapter.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path(".artifacts/freshplan-adapter.json").read_text())
+          assert report["decision"] == "replan_required"
+          assert report["replan_order"] == ["reorder", "purchase"]
+          print("FreshPlan adapter smoke test passed")
+          PY
+      - name: FreshPlan replan gate exit code
+        run: |
+          set +e
+          trustforge freshplan patch \
+            --plan evals/freshplan/replacement-patch/plan.yaml \
+            --evidence evals/freshplan/replacement-patch/changed.json \
+            --as-of "2026-09-11T09:30:00Z" \
+            --fail-on-replan > /dev/null
+          status=$?
+          set -e
+          test "$status" -eq 6
       - name: Package development version consistency
         run: |
           python - <<'PY'
@@ -105,7 +163,7 @@ jobs:
 
           pyproject = Path("pyproject.toml").read_text()
           version = re.search(r'^version = "([^"]+)"$', pyproject, re.MULTILINE).group(1)
-          assert version == "0.5.0.dev0"
+          assert version == "0.5.0.dev1"
           assert trustforge.__version__ == version
           print(f"development version consistent: {version}")
           PY

@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ptrgiang/trustforge-skills/contracts/freshplan-replacement.schema.json",
+  "title": "TrustForge FreshPlan Replacement Evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "replacements"
+  ],
+  "properties": {
+    "version": {
+      "const": "0.1"
+    },
+    "replacements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fact_id",
+          "evidence_id",
+          "observed_at",
+          "provenance",
+          "change"
+        ],
+        "anyOf": [
+          {
+            "required": [
+              "ttl_seconds"
+            ]
+          },
+          {
+            "required": [
+              "valid_until"
+            ]
+          }
+        ],
+        "properties": {
+          "fact_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ttl_seconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "valid_until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "change": {
+            "enum": [
+              "changed",
+              "unchanged",
+              "unknown"
+            ]
+          },
+          "provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source"
+            ],
+            "properties": {
+              "source": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reference": {
+                "type": "string"
+              },
+              "observed_by": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
