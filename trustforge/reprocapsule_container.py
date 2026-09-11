@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 import tempfile
 import uuid
@@ -74,12 +73,7 @@ def replay_container(
     run_timeout_seconds: float = 30.0,
     runner: CommandRunner = subprocess.run,
 ) -> dict[str, Any]:
-    """Verify a capsule and optionally reproduce it inside a hardened Docker container.
-
-    The default mode is a no-execution preflight. Actual Docker build/run requires
-    ``execute=True``. The runner is injectable so tests can validate the exact
-    Docker boundary without requiring a Docker daemon.
-    """
+    """Verify a capsule and optionally reproduce it inside a hardened Docker container."""
 
     _bounded_positive(build_timeout_seconds, name="build_timeout_seconds", maximum=600)
     _bounded_positive(run_timeout_seconds, name="run_timeout_seconds", maximum=300)
@@ -94,6 +88,7 @@ def replay_container(
         "executed": False,
         "container_built": False,
         "safety": {
+            "build_network_disabled": True,
             "network_disabled": True,
             "read_only_rootfs": True,
             "capabilities_dropped": True,
@@ -128,13 +123,17 @@ def replay_container(
             }
 
         image = f"trustforge-repro:{uuid.uuid4().hex[:12]}"
-        build_command = ["docker", "build", "--pull=false", "--tag", image, "."]
-        build = _run(
-            build_command,
-            cwd=context,
-            timeout_seconds=build_timeout_seconds,
-            runner=runner,
-        )
+        build_command = [
+            "docker",
+            "build",
+            "--pull=false",
+            "--network",
+            "none",
+            "--tag",
+            image,
+            ".",
+        ]
+        build = _run(build_command, cwd=context, timeout_seconds=build_timeout_seconds, runner=runner)
         build_stdout, _ = sanitize_trace(build.stdout or "")
         build_stderr, _ = sanitize_trace(build.stderr or "")
         if build.returncode != 0:
@@ -149,12 +148,7 @@ def replay_container(
             }
 
         run_command = _docker_runtime_args(image)
-        run = _run(
-            run_command,
-            cwd=None,
-            timeout_seconds=run_timeout_seconds,
-            runner=runner,
-        )
+        run = _run(run_command, cwd=None, timeout_seconds=run_timeout_seconds, runner=runner)
         stdout, stdout_redactions = sanitize_trace(run.stdout or "")
         stderr, stderr_redactions = sanitize_trace(run.stderr or "")
         combined = stdout + "\n" + stderr
@@ -162,7 +156,6 @@ def replay_container(
         signature_match = expected_signature is None or expected_signature in combined
         reproduced = bool(exit_match and signature_match)
 
-        # Best-effort cleanup. A failed image removal does not change the replay result.
         try:
             runner(
                 ["docker", "image", "rm", "--force", image],
@@ -190,6 +183,7 @@ def replay_container(
             "stdout": stdout,
             "stderr": stderr,
             "redactions": stdout_redactions + stderr_redactions,
+            "docker_build": build_command,
             "docker_run": run_command,
         }
 
