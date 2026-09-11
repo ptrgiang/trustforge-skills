@@ -44,6 +44,8 @@ def export_container(capsule_dir: str | Path, output_dir: str | Path) -> dict[st
         }
 
     output = Path(output_dir).resolve()
+    if output == capsule or output in capsule.parents:
+        raise ReproCapsuleError("container export output cannot be the capsule directory or one of its parents")
     if output.exists():
         if not output.is_dir():
             raise ReproCapsuleError("container export output must be a directory")
