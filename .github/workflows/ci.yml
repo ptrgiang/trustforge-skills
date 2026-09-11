@@ -24,3 +24,27 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: CommitmentGuard smoke test
         run: trustforge verify examples/refactor-contract.json --evidence examples/refactor-evidence.json
+
+  action-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run local SkillDiff action
+        uses: ./
+        with:
+          before: evals/skilldiff/python-ast-alias/before
+          after: evals/skilldiff/python-ast-alias/after
+          format: json
+          report-path: .artifacts/skilldiff.json
+      - name: Validate action report
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path('.artifacts/skilldiff.json').read_text())
+          assert report['schema_version'] == '0.3'
+          assert 'python-ast-v1' in report['detectors']
+          assert 'subprocess' in report['ast_analysis']['new_capabilities']
+          print('SkillDiff composite action smoke test passed')
+          PY
