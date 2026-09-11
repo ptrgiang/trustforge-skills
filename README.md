@@ -15,7 +15,7 @@ TrustForge Skills is an open-source collection of reliability, verification, pri
 | --- | --- | --- |
 | **SkillDiff** | Detect trust-boundary changes between skill versions | **v0.3 released** |
 | **DataLease** | Purpose- and destination-bound minimum-necessary data sharing | **v0.4.0 released** |
-| **FreshPlan** | Refresh stale evidence and re-plan only affected branches | **v0.5 development** |
+| **FreshPlan** | Refresh aging evidence and re-plan only affected branches | **v0.5 development** |
 | **CommitmentGuard** | Require evidence before an agent can claim completion | MVP |
 | **ReproCapsule** | Package failures into reproducible environments | Planned |
 
@@ -24,11 +24,11 @@ TrustForge Skills is an open-source collection of reliability, verification, pri
 FreshPlan makes freshness explicit for long-running agent plans:
 
 ```text
-facts + provenance + validity windows
+facts + provenance + freshness policy
               ↓
         dependency graph
               ↓
-         stale detection
+   fresh / refresh_due / stale
               ↓
    value-free refresh request
               ↓
@@ -46,6 +46,26 @@ trustforge freshplan check \
   --plan examples/freshplan/order-fulfillment.yaml \
   --as-of "2026-09-11T09:30:00Z"
 ```
+
+### Named freshness policies
+
+Facts can reuse plan-level policies instead of repeating TTL values:
+
+```yaml
+freshness_policies:
+  volatile:
+    refresh_after_seconds: 300
+    expire_after_seconds: 900
+
+facts:
+  - id: inventory
+    observed_at: "2026-09-11T09:20:00Z"
+    freshness_policy: volatile
+    provenance:
+      source: inventory-api
+```
+
+`refresh_after_seconds` is a soft boundary. When it is reached, the fact becomes `refresh_due` and FreshPlan recommends a refresh without invalidating the plan. `expire_after_seconds` is the hard boundary; only hard-stale facts invalidate dependent nodes. Explicit `ttl_seconds` or `valid_until` can still be used and act as additional hard bounds, with the earliest hard expiry winning.
 
 ### Emit refresh requests
 
@@ -66,7 +86,7 @@ trustforge freshplan requests \
   --json
 ```
 
-The CLI does not dynamically import or execute adapters. Application code registers trusted adapter objects explicitly.
+Refresh requests are emitted for both `refresh_due` and `stale` facts. The CLI does not dynamically import or execute adapters. Application code registers trusted adapter objects explicitly.
 
 ### Apply replacement evidence and emit a minimal patch
 
@@ -94,6 +114,8 @@ replan   → replacement changed or change is unknown
 resume   → freshness restored and replacement is explicitly unchanged
 ```
 
+Policy-bound facts may preserve their existing named freshness policy when replacement evidence omits a new TTL/absolute expiry.
+
 ### Python adapter API
 
 ```python
@@ -108,6 +130,28 @@ patch = refresh_with_adapters(
 ```
 
 Adapter requests contain freshness/provenance metadata and refresh references, not raw fact values. Adapter failures, missing registrations, malformed evidence, or evidence for the wrong fact fail closed.
+
+### Large-graph benchmark
+
+FreshPlan ships a deterministic synthetic parallel-chain generator so graph evaluation cost is measurable in CI:
+
+```bash
+trustforge freshplan benchmark \
+  --nodes 1000 5000 10000 \
+  --repeats 3 \
+  --json
+```
+
+A regression gate can cap the largest case:
+
+```bash
+trustforge freshplan benchmark \
+  --nodes 1000 5000 10000 \
+  --repeats 2 \
+  --max-median-ms 5000
+```
+
+The benchmark reports nodes, facts, edges, median/min/max runtime, throughput, stale facts, and invalidated nodes. The CI threshold is deliberately generous and is a regression alarm, not a universal performance guarantee.
 
 Contracts:
 
@@ -258,14 +302,15 @@ SkillDiff → DataLease → FreshPlan → CommitmentGuard → ReproCapsule
 4. **Destination binding** — minimum data still must not be sent to an unauthorized host/tool.
 5. **Measurable classifier quality** — publish regression metrics and known mismatches instead of claiming perfect detection.
 6. **Freshness is explicit** — facts used in plans should have provenance and validity windows.
-7. **Conservative recovery** — unknown replacement changes should trigger re-planning rather than silently resuming stale reasoning.
-8. **Failures should travel** — a bug report is more useful when another machine can reproduce it.
-9. **Agent-agnostic by default** — trust primitives should work across coding agents, MCP runtimes, and custom orchestration.
-10. **No unverifiable novelty claims** — TrustForge documents prior art and focuses on measurable capability gaps.
+7. **Refresh before invalidation when possible** — soft freshness windows can trigger proactive evidence renewal without discarding still-valid plan branches.
+8. **Conservative recovery** — unknown replacement changes should trigger re-planning rather than silently resuming stale reasoning.
+9. **Failures should travel** — a bug report is more useful when another machine can reproduce it.
+10. **Agent-agnostic by default** — trust primitives should work across coding agents, MCP runtimes, and custom orchestration.
+11. **No unverifiable novelty claims** — TrustForge documents prior art and focuses on measurable capability gaps.
 
 ## Release and compatibility
 
-- Current development package version: **0.5.0.dev1**.
+- Current development package version: **0.5.0.dev2**.
 - Latest stable release: **v0.4.0**.
 - Floating stable GitHub Action ref: **`v0`**, still pinned to the v0.4.0 release line while FreshPlan develops on `main`.
 - Stable release notes: [`docs/releases/v0.4.0.md`](docs/releases/v0.4.0.md).

@@ -22,15 +22,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `trustforge freshplan requests` and `trustforge freshplan patch` CLI commands.
 - Refresh-request, replacement-evidence, and plan-patch JSON Schemas plus deterministic refresh/patch eval fixtures.
 - Reference refresh adapter demo and CI gates for request generation, replacement patching, adapter execution, and replan exit codes.
+- Named FreshPlan freshness policies with soft `refresh_after_seconds` and hard `expire_after_seconds` boundaries.
+- `refresh_due` fact state and proactive refresh requests that do not invalidate still-valid plan branches.
+- Policy-aware replacement handling that can preserve an existing named policy when evidence omits new TTL/absolute-expiry fields.
+- `trustforge freshplan benchmark` deterministic large-graph performance runner with nodes/edges/throughput metrics.
+- 10k-node FreshPlan CI performance regression gate.
 
 ### Changed
 
-- Development package version advanced to `0.5.0.dev1` while stable `v0` remains on `v0.4.0`.
+- FreshPlan topological scheduling now uses a heap-backed ready queue for more predictable large-graph behavior.
+- Development package version advanced to `0.5.0.dev2` while stable `v0` remains on `v0.4.0`.
 
 ### Planned
 
-- FreshPlan async refresh adapters and large-graph performance benchmarks.
-- Richer FreshPlan freshness policies and runtime integrations.
+- FreshPlan async refresh adapters, runtime integrations, and persistent metadata state-store adapters.
+- Larger/more varied FreshPlan graph-shape benchmarks and domain-specific freshness-policy linting.
 - Larger multilingual/domain-specific DataLease benchmarks.
 - JavaScript/TypeScript structured SkillDiff detectors.
 - Transitive dependency capability analysis.
