@@ -1,0 +1,69 @@
+name: TrustForge SkillDiff
+description: Detect trust-boundary changes between two AI agent skill directories.
+author: TrustForge contributors
+
+branding:
+  icon: shield
+  color: purple
+
+inputs:
+  before:
+    description: Path to the trusted/baseline skill directory.
+    required: true
+  after:
+    description: Path to the candidate skill directory.
+    required: true
+  fail-on:
+    description: Optional risk threshold that fails the action (low, medium, high).
+    required: false
+    default: ""
+  format:
+    description: Report format (text, json, sarif).
+    required: false
+    default: text
+  report-path:
+    description: Optional file path to also write the report to.
+    required: false
+    default: ""
+  python-version:
+    description: Python version used to run TrustForge.
+    required: false
+    default: "3.12"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install TrustForge
+      shell: bash
+      run: python -m pip install "${{ github.action_path }}"
+
+    - name: Run SkillDiff
+      shell: bash
+      env:
+        TRUSTFORGE_BEFORE: ${{ inputs.before }}
+        TRUSTFORGE_AFTER: ${{ inputs.after }}
+        TRUSTFORGE_FAIL_ON: ${{ inputs.fail-on }}
+        TRUSTFORGE_FORMAT: ${{ inputs.format }}
+        TRUSTFORGE_REPORT_PATH: ${{ inputs.report-path }}
+      run: |
+        set +e
+        cmd=(trustforge skilldiff "$TRUSTFORGE_BEFORE" "$TRUSTFORGE_AFTER" --format "$TRUSTFORGE_FORMAT")
+        if [[ -n "$TRUSTFORGE_FAIL_ON" ]]; then
+          cmd+=(--fail-on "$TRUSTFORGE_FAIL_ON")
+        fi
+
+        if [[ -n "$TRUSTFORGE_REPORT_PATH" ]]; then
+          mkdir -p "$(dirname "$TRUSTFORGE_REPORT_PATH")"
+          "${cmd[@]}" | tee "$TRUSTFORGE_REPORT_PATH"
+          status=${PIPESTATUS[0]}
+        else
+          "${cmd[@]}"
+          status=$?
+        fi
+
+        exit "$status"
