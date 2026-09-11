@@ -15,9 +15,44 @@ TrustForge Skills is an open-source collection of reliability, verification, pri
 | --- | --- | --- |
 | **SkillDiff** | Detect trust-boundary changes between skill versions | **v0.3 released** |
 | **DataLease** | Purpose- and destination-bound minimum-necessary data sharing | **v0.4.0 released** |
+| **FreshPlan** | Invalidate only plan branches whose source facts have gone stale | **v0.5 MVP** |
 | **CommitmentGuard** | Require evidence before an agent can claim completion | MVP |
-| **FreshPlan** | Invalidate plan nodes when facts become stale | Planned |
 | **ReproCapsule** | Package failures into reproducible environments | Planned |
+
+## FreshPlan v0.5 development
+
+FreshPlan makes freshness explicit for long-running agent plans:
+
+```text
+facts + provenance + validity windows
+              ↓
+        dependency graph
+              ↓
+         stale detection
+              ↓
+ selective invalidation
+              ↓
+       minimal re-plan set
+```
+
+FreshPlan stores freshness metadata rather than raw fact values. A stale fact invalidates only the nodes that directly or transitively depend on it; unrelated branches stay valid.
+
+```bash
+trustforge freshplan check \
+  --plan examples/freshplan/order-fulfillment.yaml \
+  --as-of "2026-09-11T09:30:00Z"
+```
+
+Use JSON for orchestration:
+
+```bash
+trustforge freshplan check \
+  --plan examples/freshplan/order-fulfillment.yaml \
+  --as-of "2026-09-11T09:30:00Z" \
+  --json
+```
+
+FreshPlan reports stale facts, provenance, invalidated nodes, root stale-fact causes, unaffected nodes, and a dependency-safe `replan_order`.
 
 ## DataLease v0.4
 
@@ -167,11 +202,10 @@ SkillDiff → DataLease → FreshPlan → CommitmentGuard → ReproCapsule
 
 ## Release and compatibility
 
-- Current package version: **0.4.0**.
+- Current development package version: **0.5.0.dev0**.
 - Latest stable release: **v0.4.0**.
-- Floating stable GitHub Action ref: **`v0`**.
-- Release notes: [`docs/releases/v0.4.0.md`](docs/releases/v0.4.0.md).
-- Release checklist: [`docs/releases/v0.4.0-checklist.md`](docs/releases/v0.4.0-checklist.md).
+- Floating stable GitHub Action ref: **`v0`**, still pinned to the v0.4.0 release line while FreshPlan develops on `main`.
+- Stable release notes: [`docs/releases/v0.4.0.md`](docs/releases/v0.4.0.md).
 
 ## Roadmap
 
