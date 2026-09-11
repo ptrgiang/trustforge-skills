@@ -45,7 +45,7 @@ v0.7 distinguishes required and optional commitments so the overall result can b
         "key": "tests.passed",
         "truthy": true,
         "max_age_seconds": 300,
-        "allowed_source_kinds": ["ci", "command", "pytest"]
+        "allowed_source_kinds": ["ci", "command", "pytest", "github-actions"]
       }
     },
     {
@@ -137,6 +137,33 @@ The adapter runs `<python> -m pytest` and emits `source.kind: pytest`. Exit code
 - explicit no-output-capture flags.
 
 Pytest is not installed by TrustForge. The adapter uses the pytest installation available in the selected Python environment.
+
+### GitHub Actions evidence
+
+Inside a workflow:
+
+```yaml
+- name: Emit CI evidence
+  if: always()
+  run: |
+    trustforge evidence github-actions \
+      --key ci.passed \
+      --conclusion "${{ job.status }}" \
+      > ci-evidence.json
+```
+
+The adapter requires `GITHUB_ACTIONS=true`. It maps `success` to `true`; `failure`, `cancelled`, and `skipped` map to `false`. Provenance is assembled from non-secret runtime metadata:
+
+- `kind: github-actions`;
+- explicit conclusion;
+- repository;
+- workflow and job names;
+- run ID and run attempt;
+- commit SHA;
+- run URL;
+- optional ref and event name.
+
+It does not read `GITHUB_TOKEN` and does not call the GitHub API. Runtime environment metadata is useful provenance but is not a signed attestation from GitHub.
 
 ### JSON artifact evidence
 
@@ -241,6 +268,7 @@ CommitmentGuard cannot guarantee correctness when:
 - an artifact is trustworthy by hash but its producer was compromised;
 - command or pytest exit status is only a proxy for the actual requirement;
 - the selected pytest scope omits important tests;
+- GitHub Actions environment metadata was altered or the explicit conclusion was supplied incorrectly;
 - an optional commitment was incorrectly classified as non-blocking;
 - a natural-language requirement has not been compiled into a reliable check.
 
@@ -248,7 +276,6 @@ CommitmentGuard cannot guarantee correctness when:
 
 - evidence signatures / attestations;
 - natural-language commitment extraction;
-- dedicated GitHub Actions adapter;
 - package manifest, API diff, and browser-task adapters;
 - temporal commitments and deadlines beyond observation freshness;
 - hierarchical commitments for multi-agent workflows;
