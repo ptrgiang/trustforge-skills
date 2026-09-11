@@ -75,6 +75,17 @@ trustforge evidence command \
 
 Exit code `0` becomes `true`; nonzero becomes `false`. The command adapter uses `shell=False`, has a bounded timeout, discards stdout/stderr, and does not copy raw argv into the evidence bundle. Provenance retains only the executable, argument count, argv SHA-256 fingerprint, exit code, and explicit no-output-capture flags.
 
+### Collect pytest evidence
+
+```bash
+trustforge evidence pytest \
+  --key tests.passed \
+  --observed-at "2026-09-11T14:45:00Z" \
+  -- tests -q
+```
+
+The dedicated pytest adapter runs `<python> -m pytest` with `shell=False`, maps exit code `0` to `true`, and emits `source.kind: pytest`. Raw pytest arguments and test output are not copied into the evidence bundle; provenance keeps only the selected Python executable, argument count, argv SHA-256 fingerprint, exit code, and no-output-capture flags. Pytest remains an external workflow dependency and is not installed by TrustForge itself.
+
 ### Collect evidence from a JSON artifact
 
 ```bash
@@ -173,13 +184,14 @@ New v0.7 capabilities currently include:
 - explicit `partial` completion state and `--accept-partial` orchestration policy;
 - fail-closed handling for stale, future-dated, missing, or disallowed evidence;
 - generic command exit-code evidence collection;
+- dedicated pytest evidence collection with normalized `source.kind: pytest`;
 - JSON artifact field evidence collection with SHA-256 provenance;
 - evidence-bundle merge helper with duplicate-key rejection;
-- command provenance that deliberately omits raw argv/stdout/stderr;
+- command and pytest provenance that deliberately omit raw argv/stdout/stderr;
 - adversarial regression fixtures for stale and self-claimed evidence;
 - backward compatibility with legacy nested evidence documents.
 
-Provenance is metadata, not cryptographic attestation. A hash can establish which artifact was read, but not whether its producer was trustworthy. Likewise, an exit code is only evidence about the command that ran, not proof that the command itself was sufficient for the real-world requirement.
+Provenance is metadata, not cryptographic attestation. A hash can establish which artifact was read, but not whether its producer was trustworthy. Likewise, a command or pytest exit code is evidence about the process that ran, not proof that the selected checks were sufficient for the real-world requirement.
 
 See [`skills/commitment-guard/SKILL.md`](skills/commitment-guard/SKILL.md) and [`ROADMAP.md`](ROADMAP.md).
 
@@ -220,7 +232,7 @@ For security-sensitive workflows, pin the full release commit SHA instead of the
 - Static capability detection cannot prove runtime behavior.
 - Evidence provenance does not prove that its claimed source is authentic.
 - Artifact hashes do not prove the artifact producer was trustworthy.
-- Command exit-code evidence does not prove the command tested the right requirement.
+- Command or pytest exit-code evidence does not prove the selected checks tested the right requirement.
 - Redaction reduces disclosure but does not prove arbitrary secrets can never appear.
 - ReproCapsule host/container replay is not a complete security sandbox.
 - Container export does not capture arbitrary OS/native dependency locks.
@@ -258,7 +270,7 @@ The latest stable release is **v0.6.0**. The active development milestone is **C
 
 ## Release and compatibility
 
-- Development package version on `main` after this milestone merges: **0.7.0.dev1**
+- Development package version on `main` after this milestone merges: **0.7.0.dev2**
 - Latest stable release: **v0.6.0**
 - Floating stable GitHub Action ref: **`v0`**, pinned to the v0.6.0 release commit until the next verified release
 - License: Apache-2.0
