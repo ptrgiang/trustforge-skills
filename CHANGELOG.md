@@ -20,10 +20,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Sync and async MCP tool-call adapters that sanitize arguments before dispatch.
 - Destination binding for HTTP schemes/hosts/methods and MCP tool patterns.
 - `DataLeaseBlocked` evidence-bearing refusal before unauthorized transports execute.
+- Pluggable trusted-classifier interface with `ClassificationFinding`, `FieldClassifier`, and `CallableClassifier`.
+- Classifier provenance and confidence in value-free audit evidence.
+- Custom classifier propagation through HTTP/MCP adapters and fail-closed classifier errors.
+- `trustforge datalease benchmark` CLI with JSON/text output and precision/recall gates.
+- A 30-case synthetic adversarial classifier regression dataset.
+
+### Changed
+
+- DataLease report schema advanced from `0.1` to `0.2` to include classifier evidence.
+- Built-in phone heuristics no longer classify valid IP addresses, ISO dates, or SSN-shaped values as phone numbers.
+- `authorization`-named fields are now treated as secret-like by the built-in classifier.
+- Development package version advanced to `0.4.0.dev2`.
 
 ### Planned
 
-- DataLease pluggable classifier interface and policy precision/recall eval suite.
+- Larger multilingual and domain-specific DataLease benchmark datasets.
+- Classifier label namespace/version governance.
+- Concrete DataLease adapters for selected popular MCP/HTTP client stacks.
 - JavaScript/TypeScript structured SkillDiff detectors.
 - Transitive dependency capability analysis.
 - Signed capability baselines.
