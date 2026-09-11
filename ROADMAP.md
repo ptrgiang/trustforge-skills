@@ -135,7 +135,8 @@ Portable failure reproduction for coding agents and autonomous debugging workflo
 - [x] `ready | reproduced | diverged | blocked` replay decision contract
 - [x] Dockerfile/devcontainer export from verified capsules
 - [x] Non-root generated container user and self-contained export context
-- [ ] Additional trace redaction benchmark/adversarial fixtures
+- [x] Adversarial trace-redaction benchmark with recall/specificity CI gates
+- [x] Machine-readable redaction benchmark report contract
 - [ ] Sandboxed/containerized replay runner
 - [ ] Release hardening for `v0.6.0`
 
