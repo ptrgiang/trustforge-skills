@@ -1,7 +1,7 @@
 # TrustForge Skills
 
 [![CI](https://github.com/ptrgiang/trustforge-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/ptrgiang/trustforge-skills/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/badge/release-v0.4.0--ready-f59e0b)](docs/releases/v0.4.0.md)
+[![Release](https://img.shields.io/badge/release-v0.4.0-7c3aed)](https://github.com/ptrgiang/trustforge-skills/releases/tag/v0.4.0)
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)](pyproject.toml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
@@ -14,7 +14,7 @@ TrustForge Skills is an open-source collection of reliability, verification, pri
 | Skill | Purpose | Status |
 | --- | --- | --- |
 | **SkillDiff** | Detect trust-boundary changes between skill versions | **v0.3 released** |
-| **DataLease** | Purpose- and destination-bound minimum-necessary data sharing | **v0.4.0 release-ready** |
+| **DataLease** | Purpose- and destination-bound minimum-necessary data sharing | **v0.4.0 released** |
 | **CommitmentGuard** | Require evidence before an agent can claim completion | MVP |
 | **FreshPlan** | Invalidate plan nodes when facts become stale | Planned |
 | **ReproCapsule** | Package failures into reproducible environments | Planned |
@@ -124,7 +124,7 @@ result = adapter.call_tool(
 
 ## SkillDiff — audit trust-boundary changes
 
-Use the released GitHub Action:
+Use the stable GitHub Action line:
 
 ```yaml
 - uses: actions/checkout@v4
@@ -137,7 +137,7 @@ Use the released GitHub Action:
     report-path: artifacts/skilldiff.sarif
 ```
 
-Until the v0.4.0 GitHub Release is published and verified, the floating `v0` ref remains on the prior stable release.
+For security-sensitive workflows, pin the full release commit SHA instead of the floating `v0` ref.
 
 ## Local install
 
@@ -167,9 +167,9 @@ SkillDiff → DataLease → FreshPlan → CommitmentGuard → ReproCapsule
 
 ## Release and compatibility
 
-- Release candidate package version: **0.4.0**.
-- Latest currently published stable release remains **v0.3.0** until v0.4.0 is published.
-- Floating stable GitHub Action ref: **`v0`**; advance it only after verifying the v0.4.0 release.
+- Current package version: **0.4.0**.
+- Latest stable release: **v0.4.0**.
+- Floating stable GitHub Action ref: **`v0`**.
 - Release notes: [`docs/releases/v0.4.0.md`](docs/releases/v0.4.0.md).
 - Release checklist: [`docs/releases/v0.4.0-checklist.md`](docs/releases/v0.4.0-checklist.md).
 
