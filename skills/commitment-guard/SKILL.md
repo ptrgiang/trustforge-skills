@@ -45,7 +45,7 @@ v0.7 distinguishes required and optional commitments so the overall result can b
         "key": "tests.passed",
         "truthy": true,
         "max_age_seconds": 300,
-        "allowed_source_kinds": ["ci", "command"]
+        "allowed_source_kinds": ["ci", "command", "pytest"]
       }
     },
     {
@@ -117,6 +117,26 @@ The observation value is `true` for exit code `0` and `false` otherwise. The ada
 - explicit flags showing stdout/stderr were not captured.
 
 This reduces the chance that credentials passed on a command line are copied into an evidence bundle. It does not make putting secrets on a command line safe.
+
+### Pytest evidence
+
+```bash
+trustforge evidence pytest \
+  --key tests.passed \
+  --observed-at "2026-09-11T14:45:00Z" \
+  -- tests -q
+```
+
+The adapter runs `<python> -m pytest` and emits `source.kind: pytest`. Exit code `0` becomes `true`; any nonzero exit becomes `false`. It uses the same bounded `shell=False` runner as command evidence and deliberately does not copy raw pytest arguments, stdout, or stderr into the bundle. Provenance records only:
+
+- `kind: pytest`;
+- selected Python executable;
+- pytest argument count;
+- SHA-256 fingerprint of the full pytest argv;
+- exit code;
+- explicit no-output-capture flags.
+
+Pytest is not installed by TrustForge. The adapter uses the pytest installation available in the selected Python environment.
 
 ### JSON artifact evidence
 
@@ -219,7 +239,8 @@ CommitmentGuard cannot guarantee correctness when:
 - provenance identifies a source but does not cryptographically prove it;
 - timestamps are trustworthy in format but not in origin;
 - an artifact is trustworthy by hash but its producer was compromised;
-- command exit code is only a proxy for the actual requirement;
+- command or pytest exit status is only a proxy for the actual requirement;
+- the selected pytest scope omits important tests;
 - an optional commitment was incorrectly classified as non-blocking;
 - a natural-language requirement has not been compiled into a reliable check.
 
@@ -227,7 +248,7 @@ CommitmentGuard cannot guarantee correctness when:
 
 - evidence signatures / attestations;
 - natural-language commitment extraction;
-- dedicated pytest and GitHub Actions adapters;
+- dedicated GitHub Actions adapter;
 - package manifest, API diff, and browser-task adapters;
 - temporal commitments and deadlines beyond observation freshness;
 - hierarchical commitments for multi-agent workflows;
