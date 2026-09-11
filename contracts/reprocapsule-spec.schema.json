@@ -14,6 +14,7 @@
       "items": {"type": "string", "minLength": 1}
     },
     "expected_exit_code": {"type": "integer"},
+    "expected_failure_signature": {"type": "string", "minLength": 1},
     "working_directory": {"type": "string", "default": "."},
     "trace_file": {"type": "string", "minLength": 1},
     "inputs": {
