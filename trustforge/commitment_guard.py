@@ -122,6 +122,16 @@ def _validate_contract(contract: dict[str, Any]) -> list[dict[str, Any]]:
     return normalized
 
 
+def _validate_evidence_bundle(evidence: dict[str, Any]) -> None:
+    if "observations" not in evidence:
+        return
+    if str(evidence.get("schema_version", "")) != "0.2":
+        raise CommitmentGuardError("evidence.schema_version must be 0.2 when observations are used")
+    observations = evidence["observations"]
+    if not isinstance(observations, dict):
+        raise CommitmentGuardError("evidence.observations must be an object")
+
+
 def _observation(evidence: dict[str, Any], key: str) -> tuple[bool, Any, dict[str, Any] | None]:
     observations = evidence.get("observations")
     if isinstance(observations, dict):
@@ -235,6 +245,7 @@ def verify(
     as_of: str | None = None,
 ) -> dict[str, Any]:
     commitments = _validate_contract(contract)
+    _validate_evidence_bundle(evidence)
     evaluation_time = _resolve_as_of(as_of)
     results: list[dict[str, Any]] = []
 
