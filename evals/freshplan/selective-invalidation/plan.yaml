@@ -1,0 +1,47 @@
+version: "0.1"
+plan_id: order-fulfillment
+description: Re-evaluate only the order-planning branch whose source facts have expired.
+
+facts:
+  - id: inventory_snapshot
+    observed_at: "2026-09-11T09:00:00Z"
+    ttl_seconds: 900
+    provenance:
+      source: amazon-sp-api
+      reference: inventory-summaries
+
+  - id: carrier_cutoff
+    observed_at: "2026-09-11T09:25:00Z"
+    ttl_seconds: 3600
+    provenance:
+      source: carrier-config
+      reference: same-day-cutoff
+
+  - id: fx_rate
+    observed_at: "2026-09-11T09:20:00Z"
+    ttl_seconds: 7200
+    provenance:
+      source: treasury-feed
+      reference: usd-vnd
+
+nodes:
+  - id: reorder_recommendation
+    title: Recompute reorder quantity
+    depends_on:
+      facts: [inventory_snapshot]
+
+  - id: purchase_order
+    title: Draft purchase order
+    depends_on:
+      facts: [carrier_cutoff]
+      nodes: [reorder_recommendation]
+
+  - id: shipping_quote
+    title: Compute same-day shipping quote
+    depends_on:
+      facts: [carrier_cutoff]
+
+  - id: localized_total
+    title: Render localized order total
+    depends_on:
+      facts: [fx_rate]

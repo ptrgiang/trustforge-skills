@@ -14,6 +14,12 @@ from .datalease_eval import (
     dumps as dump_benchmark,
     render_text as render_benchmark,
 )
+from .freshplan import (
+    FreshPlanError,
+    dumps as dump_freshplan,
+    evaluate_file as evaluate_freshplan,
+    render_text as render_freshplan,
+)
 from .skilldiff_v03 import compare, dumps as dump_skilldiff, dumps_sarif, render_text as render_skilldiff
 
 
@@ -63,6 +69,25 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=None,
         help="Exit 5 when micro recall is below this threshold",
+    )
+
+    freshplan = sub.add_parser("freshplan", help="Evaluate freshness-aware dependency graphs")
+    freshplan_sub = freshplan.add_subparsers(dest="freshplan_command", required=True)
+    freshplan_check = freshplan_sub.add_parser(
+        "check",
+        help="Find stale facts and selectively invalidate dependent plan nodes",
+    )
+    freshplan_check.add_argument("--plan", required=True, help="Path to a FreshPlan JSON/YAML document")
+    freshplan_check.add_argument(
+        "--as-of",
+        default=None,
+        help="ISO-8601 evaluation time; defaults to current UTC time",
+    )
+    freshplan_check.add_argument("--json", action="store_true", dest="as_json")
+    freshplan_check.add_argument(
+        "--fail-on-stale",
+        action="store_true",
+        help="Exit 6 when stale facts invalidate one or more plan nodes",
     )
 
     return parser
@@ -133,6 +158,18 @@ def main(argv: list[str] | None = None) -> int:
             return 5
         if args.min_recall is not None and micro["recall"] < args.min_recall:
             return 5
+        return 0
+
+    if args.command == "freshplan" and args.freshplan_command == "check":
+        try:
+            report = evaluate_freshplan(args.plan, as_of=args.as_of)
+        except (FreshPlanError, OSError, json.JSONDecodeError) as exc:
+            print(f"FreshPlan error: {exc}", file=sys.stderr)
+            return 6
+
+        print(dump_freshplan(report) if args.as_json else render_freshplan(report))
+        if args.fail_on_stale and report["decision"] == "replan_required":
+            return 6
         return 0
 
     return 1

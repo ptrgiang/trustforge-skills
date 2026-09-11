@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ptrgiang/trustforge-skills/contracts/freshplan.schema.json",
+  "title": "TrustForge FreshPlan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "facts",
+    "nodes"
+  ],
+  "properties": {
+    "version": {
+      "const": "0.1"
+    },
+    "plan_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "facts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "observed_at",
+          "provenance"
+        ],
+        "anyOf": [
+          {
+            "required": [
+              "ttl_seconds"
+            ]
+          },
+          {
+            "required": [
+              "valid_until"
+            ]
+          }
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ttl_seconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "valid_until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source"
+            ],
+            "properties": {
+              "source": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reference": {
+                "type": "string"
+              },
+              "observed_by": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string"
+          },
+          "depends_on": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "facts": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "nodes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
