@@ -86,6 +86,22 @@ trustforge evidence pytest \
 
 The dedicated pytest adapter runs `<python> -m pytest` with `shell=False`, maps exit code `0` to `true`, and emits `source.kind: pytest`. Raw pytest arguments and test output are not copied into the evidence bundle; provenance keeps only the selected Python executable, argument count, argv SHA-256 fingerprint, exit code, and no-output-capture flags. Pytest remains an external workflow dependency and is not installed by TrustForge itself.
 
+### Collect GitHub Actions evidence
+
+Inside GitHub Actions:
+
+```yaml
+- name: Emit CI evidence
+  if: always()
+  run: |
+    trustforge evidence github-actions \
+      --key ci.passed \
+      --conclusion "${{ job.status }}" \
+      > ci-evidence.json
+```
+
+The adapter requires `GITHUB_ACTIONS=true`, maps `success` to `true` and other supported conclusions to `false`, and records non-secret runtime metadata such as repository, workflow, job, run ID/attempt, SHA, ref, event, and run URL. It does not read `GITHUB_TOKEN`, call the GitHub API, or claim that the metadata is cryptographically attested.
+
 ### Collect evidence from a JSON artifact
 
 ```bash
@@ -185,13 +201,14 @@ New v0.7 capabilities currently include:
 - fail-closed handling for stale, future-dated, missing, or disallowed evidence;
 - generic command exit-code evidence collection;
 - dedicated pytest evidence collection with normalized `source.kind: pytest`;
+- GitHub Actions runtime evidence collection with normalized `source.kind: github-actions` and no API token requirement;
 - JSON artifact field evidence collection with SHA-256 provenance;
 - evidence-bundle merge helper with duplicate-key rejection;
 - command and pytest provenance that deliberately omit raw argv/stdout/stderr;
 - adversarial regression fixtures for stale and self-claimed evidence;
 - backward compatibility with legacy nested evidence documents.
 
-Provenance is metadata, not cryptographic attestation. A hash can establish which artifact was read, but not whether its producer was trustworthy. Likewise, a command or pytest exit code is evidence about the process that ran, not proof that the selected checks were sufficient for the real-world requirement.
+Provenance is metadata, not cryptographic attestation. A hash can establish which artifact was read, but not whether its producer was trustworthy. Likewise, command/pytest exit codes and GitHub Actions runtime metadata are evidence about observed workflow state, not proof that the selected checks were sufficient or that GitHub signed the evidence.
 
 See [`skills/commitment-guard/SKILL.md`](skills/commitment-guard/SKILL.md) and [`ROADMAP.md`](ROADMAP.md).
 
@@ -233,6 +250,7 @@ For security-sensitive workflows, pin the full release commit SHA instead of the
 - Evidence provenance does not prove that its claimed source is authentic.
 - Artifact hashes do not prove the artifact producer was trustworthy.
 - Command or pytest exit-code evidence does not prove the selected checks tested the right requirement.
+- GitHub Actions environment metadata is useful provenance but is not a signed attestation from GitHub.
 - Redaction reduces disclosure but does not prove arbitrary secrets can never appear.
 - ReproCapsule host/container replay is not a complete security sandbox.
 - Container export does not capture arbitrary OS/native dependency locks.
@@ -270,7 +288,7 @@ The latest stable release is **v0.6.0**. The active development milestone is **C
 
 ## Release and compatibility
 
-- Development package version on `main` after this milestone merges: **0.7.0.dev2**
+- Development package version on `main` after this milestone merges: **0.7.0.dev3**
 - Latest stable release: **v0.6.0**
 - Floating stable GitHub Action ref: **`v0`**, pinned to the v0.6.0 release commit until the next verified release
 - License: Apache-2.0

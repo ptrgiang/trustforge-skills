@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 
 class CommitmentEvidenceError(ValueError):
@@ -126,6 +127,67 @@ def collect_pytest(
             "stdout_captured": False,
             "stderr_captured": False,
         },
+    )
+
+
+def collect_github_actions(
+    key: str,
+    conclusion: str,
+    *,
+    observed_at: str | None = None,
+    environment: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    env = os.environ if environment is None else environment
+    normalized = conclusion.strip().lower() if isinstance(conclusion, str) else ""
+    allowed = {"success", "failure", "cancelled", "skipped"}
+    if normalized not in allowed:
+        raise CommitmentEvidenceError(
+            "GitHub Actions conclusion must be one of: success, failure, cancelled, skipped"
+        )
+    if str(env.get("GITHUB_ACTIONS", "")).lower() != "true":
+        raise CommitmentEvidenceError("GitHub Actions evidence requires GITHUB_ACTIONS=true")
+
+    required = {
+        "repository": "GITHUB_REPOSITORY",
+        "run_id": "GITHUB_RUN_ID",
+        "run_attempt": "GITHUB_RUN_ATTEMPT",
+        "workflow": "GITHUB_WORKFLOW",
+        "job": "GITHUB_JOB",
+        "sha": "GITHUB_SHA",
+    }
+    values: dict[str, str] = {}
+    missing: list[str] = []
+    for output_name, env_name in required.items():
+        value = env.get(env_name)
+        if not isinstance(value, str) or not value:
+            missing.append(env_name)
+        else:
+            values[output_name] = value
+    if missing:
+        raise CommitmentEvidenceError(
+            f"missing required GitHub Actions metadata: {', '.join(sorted(missing))}"
+        )
+
+    server_url = env.get("GITHUB_SERVER_URL", "https://github.com").rstrip("/")
+    source: dict[str, Any] = {
+        "kind": "github-actions",
+        "conclusion": normalized,
+        **values,
+        "run_url": f"{server_url}/{values['repository']}/actions/runs/{values['run_id']}",
+    }
+    for source_key, env_name in (
+        ("ref", "GITHUB_REF"),
+        ("event_name", "GITHUB_EVENT_NAME"),
+    ):
+        value = env.get(env_name)
+        if isinstance(value, str) and value:
+            source[source_key] = value
+
+    return _bundle(
+        key,
+        normalized == "success",
+        _observed_at(observed_at),
+        source,
     )
 
 

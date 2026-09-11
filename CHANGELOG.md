@@ -24,14 +24,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Shared-preflight coverage for command and JSON artifact evidence collection.
 - `trustforge evidence pytest` for normalized pytest pass/fail evidence using `<python> -m pytest`.
 - Pytest collector and CLI orchestration regression tests without making pytest a TrustForge runtime dependency.
+- `trustforge evidence github-actions` for evidence based on GitHub Actions runtime metadata without API calls.
+- GitHub Actions provenance for repository, workflow, job, run ID/attempt, commit SHA, run URL, and optional ref/event metadata.
+- Shared-preflight validation of GitHub Actions evidence on the real Actions runtime.
 
 ### Changed
 
-- Development package/runtime version advanced to `0.7.0.dev2`.
+- Development package/runtime version advanced to `0.7.0.dev3`.
 - CommitmentGuard preserves legacy nested evidence and string-waiver compatibility while emitting report schema v0.2.
 - Stale, future-dated, expired-waiver, missing-policy metadata, and disallowed-source evidence fail closed to `UNKNOWN`.
 - Command evidence provenance omits raw argv, stdout, and stderr; it records executable, argument count, argv SHA-256, and exit code instead.
 - Pytest evidence uses normalized `source.kind: pytest` and records only Python executable, argument count, argv SHA-256, exit code, and no-output-capture flags.
+- GitHub Actions evidence uses normalized `source.kind: github-actions`; only explicit supported conclusions are accepted.
 
 ### Security
 
@@ -39,10 +43,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Evidence bundles do not copy raw command or pytest arguments, reducing accidental disclosure of command-line credentials. This does not make passing secrets on command lines safe.
 - Artifact SHA-256 identifies the exact bytes read but does not attest that the artifact producer was trustworthy.
 - Pytest exit status proves only the selected pytest process result; it does not prove the chosen test scope was sufficient for the underlying commitment.
+- GitHub Actions evidence fails closed outside Actions or when required runtime metadata is missing.
+- The GitHub Actions adapter does not read `GITHUB_TOKEN` and makes no GitHub API/network call.
+- GitHub Actions environment metadata and explicit conclusions are provenance, not cryptographic attestations from GitHub.
 
 ### Planned
 
-- Dedicated GitHub Actions CommitmentGuard evidence adapter.
 - Package-manifest and API-diff evidence adapters.
 - Signed evidence attestations.
 - Cross-platform dependency/environment lock capture for ReproCapsule.

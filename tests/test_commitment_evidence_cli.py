@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import unittest
 from contextlib import redirect_stdout
 from unittest.mock import patch
@@ -72,6 +73,55 @@ class CommitmentEvidenceCliTests(unittest.TestCase):
             observed_at="2026-09-11T14:45:00Z",
             timeout_seconds=42.0,
         )
+
+    def test_github_actions_parser_accepts_explicit_conclusion(self):
+        args = build_parser().parse_args(
+            [
+                "evidence",
+                "github-actions",
+                "--key",
+                "ci.passed",
+                "--conclusion",
+                "success",
+            ]
+        )
+        self.assertEqual(args.evidence_command, "github-actions")
+        self.assertEqual(args.key, "ci.passed")
+        self.assertEqual(args.conclusion, "success")
+
+    def test_github_actions_cli_uses_runtime_environment(self):
+        env = {
+            "GITHUB_ACTIONS": "true",
+            "GITHUB_REPOSITORY": "owner/repo",
+            "GITHUB_RUN_ID": "99",
+            "GITHUB_RUN_ATTEMPT": "1",
+            "GITHUB_WORKFLOW": "CI",
+            "GITHUB_JOB": "test",
+            "GITHUB_SHA": "abc123",
+            "GITHUB_TOKEN": "secret-token",
+        }
+        output = io.StringIO()
+        with patch.dict(os.environ, env, clear=True):
+            with redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "evidence",
+                        "github-actions",
+                        "--key",
+                        "ci.passed",
+                        "--conclusion",
+                        "success",
+                        "--observed-at",
+                        "2026-09-11T14:55:00Z",
+                    ]
+                )
+        self.assertEqual(exit_code, 0)
+        report = json.loads(output.getvalue())
+        observation = report["observations"]["ci.passed"]
+        self.assertTrue(observation["value"])
+        self.assertEqual(observation["source"]["kind"], "github-actions")
+        self.assertEqual(observation["source"]["run_id"], "99")
+        self.assertNotIn("secret-token", output.getvalue())
 
 
 if __name__ == "__main__":
