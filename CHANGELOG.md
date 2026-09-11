@@ -6,6 +6,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-12
+
+### Added
+
+- CommitmentGuard signed evidence attestation schema v0.1 using Ed25519.
+- Canonical JSON hashing for observation values and provenance metadata before signing.
+- Attestation binding for observation key, issuer, key ID, issue time, and optional expiry.
+- Evidence-rule policy fields `require_attestation`, `allowed_attestation_issuers`, and `allowed_attestation_key_ids`.
+- External trust registry mapping `(issuer, key_id)` identities to Ed25519 public-key PEM files.
+- `trustforge evidence sign` for attaching an attestation to one evidence observation.
+- `trustforge evidence verify-attestation` for direct signature-policy verification.
+- `trustforge verify --trust-registry` integration for completion contracts that require signed evidence.
+- Verification-report attestation metadata without echoing raw signatures.
+- Signed-evidence adversarial fixture with valid, tampered, expired, and issuer-policy regression cases.
+- Dedicated signed-attestation trust-model documentation.
+
+### Changed
+
+- Package/runtime version advanced to `0.8.0`.
+- CommitmentGuard can now require cryptographically signed evidence while preserving v0.7 evidence/provenance compatibility.
+- Trust material remains external to the completion contract; contracts cannot make an arbitrary embedded key trusted.
+- Trust-registry `public_key_file` entries must be relative paths and resolve inside the registry directory.
+- `cryptography>=43.0` is now a runtime dependency for Ed25519 signing and verification.
+
+### Security
+
+- Missing, malformed, invalid-signature, tampered, future-dated, expired, unknown-key, disallowed-issuer, and disallowed-key attestations fail closed to `UNKNOWN`.
+- Attestations bind hashes of both the observation value and provenance so either can no longer be altered without invalidating the signature.
+- Private signing keys are not stored in the trust registry, completion contract, signed-evidence regression fixture, or verification report.
+- Trust-registry path traversal and absolute-path references are rejected.
+- A valid signature proves only that the holder of the corresponding private key signed the canonical payload. It does not prove the signer collected correct evidence, that the signer was uncompromised, or that the trust registry was distributed securely.
+- v0.8 intentionally does not claim a complete PKI, revocation service, transparency log, remote signer, or KMS/HSM integration.
+
 ## [0.7.0] - 2026-09-11
 
 ### Added
@@ -220,7 +253,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Initial CommitmentGuard evidence verifier.
 - CLI, tests, contracts, examples, CI, security policy, and contributing guide.
 
-[Unreleased]: https://github.com/ptrgiang/trustforge-skills/compare/v0.7.0...main
+[Unreleased]: https://github.com/ptrgiang/trustforge-skills/compare/v0.8.0...main
+[0.8.0]: https://github.com/ptrgiang/trustforge-skills/releases/tag/v0.8.0
 [0.7.0]: https://github.com/ptrgiang/trustforge-skills/releases/tag/v0.7.0
 [0.6.0]: https://github.com/ptrgiang/trustforge-skills/releases/tag/v0.6.0
 [0.5.0]: https://github.com/ptrgiang/trustforge-skills/releases/tag/v0.5.0

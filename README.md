@@ -62,9 +62,11 @@ trustforge freshplan check \
   --as-of "2026-09-11T09:30:00Z"
 ```
 
-## CommitmentGuard v0.7.0
+## CommitmentGuard v0.8.0 release candidate
 
 CommitmentGuard turns completion claims into explicit contracts that can be checked against structured evidence.
+
+v0.8 adds an optional signed-evidence layer on top of the v0.7 completion-contract model:
 
 ```text
 user commitments
@@ -75,7 +77,11 @@ evidence collection adapters
       ↓
 evidence observations + provenance
       ↓
-freshness + source trust policy
+optional Ed25519 attestation
+      ↓
+issuer + key policy + trust registry
+      ↓
+freshness / source / signature checks
       ↓
 PASS / FAIL / UNKNOWN / WAIVED
       ↓
@@ -91,92 +97,75 @@ trustforge verify \
   --as-of "2026-09-11T14:01:00Z"
 ```
 
-v0.7.0 adds:
+### Require signed evidence
 
-- contract, evidence, and report schemas v0.2;
-- required vs optional commitments;
-- `verified_complete | partial | not_verified` completion states;
-- structured waivers with expiry;
-- deterministic `--as-of` evaluation;
-- evidence freshness via `max_age_seconds`;
-- source trust via `allowed_source_kinds`;
-- fail-closed stale/future/untrusted evidence handling;
-- generic command exit-code evidence;
-- dedicated pytest evidence;
-- GitHub Actions runtime evidence without API tokens/network calls;
-- JSON artifact field evidence with SHA-256 provenance;
-- exact package-manifest snapshot evidence;
-- OpenAPI path+method removal evidence;
-- evidence-bundle merge with duplicate-key rejection;
-- backward compatibility with legacy nested evidence documents.
+A contract can require an attestation and restrict acceptable signer identities:
 
-### Command evidence
+```json
+{
+  "key": "ci.passed",
+  "truthy": true,
+  "require_attestation": true,
+  "allowed_attestation_issuers": ["release-ci"],
+  "allowed_attestation_key_ids": ["2026-09"]
+}
+```
+
+Trusted public keys are supplied separately through a trust registry, so the completion contract cannot make an arbitrary embedded key trusted.
+
+### Sign an evidence observation
 
 ```bash
-trustforge evidence command \
-  --key tests.passed \
-  --observed-at "2026-09-11T14:30:00Z" \
-  -- python -m unittest discover -s tests
+trustforge evidence sign \
+  --input evidence.json \
+  --key ci.passed \
+  --private-key signer.pem \
+  --issuer release-ci \
+  --key-id 2026-09 \
+  --issued-at 2026-09-12T00:00:00Z \
+  --expires-at 2026-09-13T00:00:00Z \
+  > signed-evidence.json
 ```
 
-Exit code `0` becomes `true`; nonzero becomes `false`. Raw argv/stdout/stderr are not copied into the evidence bundle.
-
-### Pytest evidence
+### Verify a signed observation
 
 ```bash
-trustforge evidence pytest \
-  --key tests.passed \
-  --observed-at "2026-09-11T14:45:00Z" \
-  -- tests -q
+trustforge evidence verify-attestation \
+  --input signed-evidence.json \
+  --key ci.passed \
+  --trust-registry trust-registry.json \
+  --as-of 2026-09-12T01:00:00Z
 ```
 
-Pytest remains an external workflow dependency. The adapter records normalized process provenance without copying raw pytest arguments or output.
-
-### GitHub Actions evidence
-
-```yaml
-- name: Emit CI evidence
-  if: always()
-  run: |
-    trustforge evidence github-actions \
-      --key ci.passed \
-      --conclusion "${{ job.status }}" \
-      > ci-evidence.json
-```
-
-This adapter requires `GITHUB_ACTIONS=true`, records a whitelist of non-secret runtime metadata, does not read `GITHUB_TOKEN`, and makes no GitHub API call.
-
-### JSON artifact evidence
+### Require the signature in the completion gate
 
 ```bash
-trustforge evidence json-artifact \
-  --key tests.coverage \
-  --input coverage.json \
-  --value-path totals.percent
+trustforge verify contract.json \
+  --evidence signed-evidence.json \
+  --trust-registry trust-registry.json \
+  --as-of 2026-09-12T01:00:00Z
 ```
 
-### Package-manifest evidence
+v0.8 adds:
 
-```bash
-trustforge evidence package-manifest \
-  --input pyproject.toml
-```
+- Ed25519 attestation schema v0.1;
+- canonical JSON hashing for observation values and provenance;
+- signature binding to observation key, issuer, key ID, issue time, and optional expiry;
+- `require_attestation` and issuer/key allow-list policies;
+- external public-key trust registry;
+- fail-closed handling for missing, malformed, invalid-signature, tampered, future-dated, expired, unknown-key, and disallowed signer evidence;
+- trust-registry path confinement;
+- signed-evidence adversarial fixtures;
+- direct sign/verify CLI flows;
+- compatibility with the v0.7 contract/evidence/report schema line.
 
-The observation value is the exact SHA-256 digest of the manifest. It proves which bytes were read, not that the dependencies are safe.
+The v0.7 evidence adapters remain available: command, pytest, GitHub Actions, JSON artifact, package manifest, and narrow OpenAPI path+method removal evidence.
 
-### API-diff evidence
+A valid signature proves that the holder of the corresponding private key signed the canonical payload. It does **not** prove that the signer collected correct evidence, that the signer was uncompromised, that the evidence was sufficient, or that the trust registry itself was distributed securely.
 
-```bash
-trustforge evidence api-diff \
-  --before openapi-before.json \
-  --after openapi-after.json
-```
+TrustForge v0.8 is therefore a signed-evidence primitive, not a complete PKI system. Cloud KMS/HSM integration, certificate chains, transparency logs, remote signing, and automatic revocation distribution remain out of scope for this release.
 
-The first API-diff contract checks OpenAPI-like JSON path+HTTP-method removals. It returns `true` when no operation was removed. Provenance stores document hashes and counts rather than endpoint names. It does **not** claim to detect schema-level or semantic breaking changes.
-
-Provenance is metadata, not cryptographic attestation. Hashes identify exact bytes, process exit status identifies an observed process result, and GitHub Actions metadata identifies runtime context; none of these alone proves the source was trustworthy or the check was sufficient for the real-world requirement.
-
-Release notes: [`docs/releases/v0.7.0.md`](docs/releases/v0.7.0.md)
+Release notes: [`docs/releases/v0.8.0.md`](docs/releases/v0.8.0.md)
 
 ## ReproCapsule v0.6.0
 
@@ -228,11 +217,12 @@ For security-sensitive workflows, pin the full release commit SHA instead of the
 - Performance gates are regression alarms, not production SLAs.
 - Freshness policies cannot prove that a domain-specific TTL is correct.
 - Static capability detection cannot prove runtime behavior.
-- Evidence provenance does not prove source authenticity.
+- Unsigned evidence provenance does not prove source authenticity.
+- A valid attestation does not prove the signer or underlying evidence source was trustworthy.
 - Artifact/package hashes do not prove the producer or dependencies were trustworthy.
 - Command or pytest exit-code evidence does not prove the selected checks tested the right requirement.
-- GitHub Actions environment metadata is useful provenance but is not a signed attestation from GitHub.
-- API-diff v0.7 only checks path+method removals, not arbitrary schema/semantic compatibility.
+- GitHub Actions environment metadata is useful provenance but is not itself a signed attestation from GitHub.
+- API-diff only checks path+method removals, not arbitrary schema/semantic compatibility.
 - Redaction reduces disclosure but does not prove arbitrary secrets can never appear.
 - ReproCapsule host/container replay is not a complete security sandbox.
 
@@ -242,7 +232,7 @@ The goal is useful infrastructure with measurable boundaries, not perfect detect
 
 TrustForge is still pre-1.0 and is being developed in the open. The repository includes implementation, eval fixtures, known limitations, release checklists, benchmark gates, and design tradeoffs as they evolve.
 
-The latest stable release is **v0.7.0**. Future development continues on `main`; the floating stable `v0` ref now points to the verified v0.7.0 release commit.
+The latest published stable release remains **v0.7.0** while v0.8.0 is in release-candidate validation. The floating stable `v0` ref remains pinned to the verified v0.7.0 release commit until v0.8.0 is published and verified.
 
 ## Design principles
 
@@ -253,8 +243,9 @@ The latest stable release is **v0.7.0**. Future development continues on `main`;
 5. **Freshness is explicit.** Plans and completion evidence should know when their facts are aging.
 6. **Conservative recovery.** Unknown evidence should not silently become proof.
 7. **Failures should travel.** Reproduction should not depend on the original machine.
-8. **Agent-agnostic by default.** Trust primitives should work across runtimes.
-9. **No unverifiable novelty claims.** Measure the gap instead.
+8. **Trust roots stay external.** A policy should not be able to declare its own arbitrary signer trusted.
+9. **Agent-agnostic by default.** Trust primitives should work across runtimes.
+10. **No unverifiable novelty claims.** Measure the gap instead.
 
 ## Project map
 
@@ -269,9 +260,9 @@ The latest stable release is **v0.7.0**. Future development continues on `main`;
 
 ## Release and compatibility
 
-- Package/runtime version: **0.7.0**
-- Latest stable release: **v0.7.0**
-- Floating stable GitHub Action ref: **`v0`**, pinned to the verified v0.7.0 release commit
+- Package/runtime version: **0.8.0** (release candidate)
+- Latest published stable release: **v0.7.0**
+- Floating stable GitHub Action ref: **`v0`**, still pinned to the verified v0.7.0 release commit
 - License: Apache-2.0
 
 ## Contributing
