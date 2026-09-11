@@ -20,6 +20,12 @@ from .freshplan import (
     evaluate_file as evaluate_freshplan,
     render_text as render_freshplan,
 )
+from .freshplan_benchmark import (
+    FreshPlanBenchmarkError,
+    benchmark as benchmark_freshplan,
+    dumps as dump_freshplan_benchmark,
+    render_text as render_freshplan_benchmark,
+)
 from .freshplan_refresh import (
     FreshPlanRefreshError,
     build_plan_patch_file,
@@ -101,7 +107,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     freshplan_requests = freshplan_sub.add_parser(
         "requests",
-        help="Emit value-free refresh requests for stale facts",
+        help="Emit value-free refresh requests for stale or refresh-due facts",
     )
     freshplan_requests.add_argument("--plan", required=True, help="Path to a FreshPlan JSON/YAML document")
     freshplan_requests.add_argument("--as-of", default=None, help="ISO-8601 evaluation time")
@@ -123,6 +129,26 @@ def build_parser() -> argparse.ArgumentParser:
         "--fail-on-replan",
         action="store_true",
         help="Exit 6 when the patch is blocked or requires re-planning",
+    )
+
+    freshplan_bench = freshplan_sub.add_parser(
+        "benchmark",
+        help="Benchmark deterministic FreshPlan evaluation on generated large graphs",
+    )
+    freshplan_bench.add_argument(
+        "--nodes",
+        nargs="+",
+        type=int,
+        default=[1000, 5000, 10000],
+        help="One or more generated graph node counts",
+    )
+    freshplan_bench.add_argument("--repeats", type=int, default=3)
+    freshplan_bench.add_argument("--json", action="store_true", dest="as_json")
+    freshplan_bench.add_argument(
+        "--max-median-ms",
+        type=float,
+        default=None,
+        help="Exit 6 when the largest generated case exceeds this median runtime",
     )
 
     return parser
@@ -226,6 +252,28 @@ def main(argv: list[str] | None = None) -> int:
 
         print(dump_freshplan_refresh(report) if args.as_json else render_patch_text(report))
         if args.fail_on_replan and report["decision"] in {"blocked", "replan_required"}:
+            return 6
+        return 0
+
+    if args.command == "freshplan" and args.freshplan_command == "benchmark":
+        if args.max_median_ms is not None and args.max_median_ms <= 0:
+            print("FreshPlan benchmark error: --max-median-ms must be positive", file=sys.stderr)
+            return 6
+        try:
+            report = benchmark_freshplan(args.nodes, repeats=args.repeats)
+        except (FreshPlanBenchmarkError, FreshPlanError) as exc:
+            print(f"FreshPlan benchmark error: {exc}", file=sys.stderr)
+            return 6
+
+        print(
+            dump_freshplan_benchmark(report)
+            if args.as_json
+            else render_freshplan_benchmark(report)
+        )
+        if (
+            args.max_median_ms is not None
+            and report["largest_case"]["median_ms"] > args.max_median_ms
+        ):
             return 6
         return 0
 

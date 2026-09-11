@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import heapq
 import json
 from dataclasses import dataclass
 from datetime import datetime
@@ -104,16 +105,16 @@ def _node_graph(plan: dict[str, Any]) -> tuple[list[str], dict[str, set[str]], d
             if dep not in children:
                 raise FreshPlanRefreshError(f"node {node_id}: unknown node dependency: {dep}")
             children[dep].add(node_id)
-    ready = sorted(node_id for node_id, degree in indegree.items() if degree == 0)
+    ready = [node_id for node_id, degree in indegree.items() if degree == 0]
+    heapq.heapify(ready)
     topo: list[str] = []
     while ready:
-        node_id = ready.pop(0)
+        node_id = heapq.heappop(ready)
         topo.append(node_id)
-        for child in sorted(children[node_id]):
+        for child in children[node_id]:
             indegree[child] -= 1
             if indegree[child] == 0:
-                ready.append(child)
-                ready.sort()
+                heapq.heappush(ready, child)
     if len(topo) != len(node_deps):
         raise FreshPlanRefreshError("plan node dependency cycle detected")
     return topo, fact_deps, children
@@ -125,7 +126,8 @@ def build_refresh_requests(plan: dict[str, Any], *, as_of: str | None = None) ->
     reports = {item["id"]: item for item in report["facts"]}
     requests: list[dict[str, Any]] = []
 
-    for fact_id in report["stale_facts"]:
+    refresh_ids = sorted(set(report["stale_facts"]) | set(report.get("refresh_due_facts", [])))
+    for fact_id in refresh_ids:
         fact = facts[fact_id]
         refresh = fact.get("refresh")
         configured = isinstance(refresh, dict) and isinstance(refresh.get("adapter"), str) and bool(refresh["adapter"].strip())
@@ -137,28 +139,34 @@ def build_refresh_requests(plan: dict[str, Any], *, as_of: str | None = None) ->
             reference = fact["provenance"]["reference"]
 
         item = reports[fact_id]
-        requests.append(
-            {
-                "fact_id": fact_id,
-                "configured": configured,
-                "adapter": adapter,
-                "reference": reference,
-                "reason": item["reason"],
-                "as_of": report["as_of"],
-                "current": {
-                    "observed_at": item["observed_at"],
-                    "expires_at": item["expires_at"],
-                    "provenance": item["provenance"],
-                },
-            }
-        )
+        current: dict[str, Any] = {
+            "status": item["status"],
+            "observed_at": item["observed_at"],
+            "expires_at": item["expires_at"],
+            "provenance": item["provenance"],
+        }
+        if "refresh_due_at" in item:
+            current["refresh_due_at"] = item["refresh_due_at"]
+        if "freshness_policy" in item:
+            current["freshness_policy"] = item["freshness_policy"]
+
+        requests.append({
+            "fact_id": fact_id,
+            "configured": configured,
+            "adapter": adapter,
+            "reference": reference,
+            "reason": item["reason"],
+            "as_of": report["as_of"],
+            "current": current,
+        })
 
     return {
         "schema_version": "0.1",
         "as_of": report["as_of"],
         "decision": "refresh_required" if requests else "fresh",
         "summary": {
-            "stale_facts": len(requests),
+            "stale_facts": len(report["stale_facts"]),
+            "refresh_due_facts": len(report.get("refresh_due_facts", [])),
             "configured_requests": sum(1 for item in requests if item["configured"]),
             "unconfigured_requests": sum(1 for item in requests if not item["configured"]),
         },
@@ -170,15 +178,7 @@ def build_refresh_requests_file(path: str | Path, *, as_of: str | None = None) -
     return build_refresh_requests(load_plan(path), as_of=as_of)
 
 
-_ALLOWED_REPLACEMENT_KEYS = {
-    "fact_id",
-    "evidence_id",
-    "observed_at",
-    "ttl_seconds",
-    "valid_until",
-    "provenance",
-    "change",
-}
+_ALLOWED_REPLACEMENT_KEYS = {"fact_id", "evidence_id", "observed_at", "ttl_seconds", "valid_until", "provenance", "change"}
 
 
 def _normalize_replacement(item: Any, index: int) -> dict[str, Any]:
@@ -186,23 +186,13 @@ def _normalize_replacement(item: Any, index: int) -> dict[str, Any]:
         raise FreshPlanRefreshError(f"replacements[{index}] must be an object")
     unknown = sorted(set(item) - _ALLOWED_REPLACEMENT_KEYS)
     if unknown:
-        raise FreshPlanRefreshError(
-            f"replacements[{index}] contains unsupported fields: {', '.join(unknown)}"
-        )
+        raise FreshPlanRefreshError(f"replacements[{index}] contains unsupported fields: {', '.join(unknown)}")
     fact_id = _require_text(item.get("fact_id"), f"replacements[{index}].fact_id")
     evidence_id = _require_text(item.get("evidence_id"), f"replacement {fact_id}.evidence_id")
     observed_at = _validate_timestamp(item.get("observed_at"), f"replacement {fact_id}.observed_at")
     change = _require_text(item.get("change"), f"replacement {fact_id}.change")
     if change not in {"changed", "unchanged", "unknown"}:
-        raise FreshPlanRefreshError(
-            f"replacement {fact_id}.change must be changed, unchanged, or unknown"
-        )
-    has_ttl = "ttl_seconds" in item
-    has_until = "valid_until" in item
-    if not has_ttl and not has_until:
-        raise FreshPlanRefreshError(
-            f"replacement {fact_id} requires ttl_seconds or valid_until"
-        )
+        raise FreshPlanRefreshError(f"replacement {fact_id}.change must be changed, unchanged, or unknown")
     result: dict[str, Any] = {
         "fact_id": fact_id,
         "evidence_id": evidence_id,
@@ -210,15 +200,13 @@ def _normalize_replacement(item: Any, index: int) -> dict[str, Any]:
         "provenance": _safe_provenance(item.get("provenance"), f"replacement {fact_id}.provenance"),
         "change": change,
     }
-    if has_ttl:
+    if "ttl_seconds" in item:
         ttl = item["ttl_seconds"]
         if isinstance(ttl, bool) or not isinstance(ttl, (int, float)) or ttl < 0:
             raise FreshPlanRefreshError(f"replacement {fact_id}.ttl_seconds must be non-negative")
         result["ttl_seconds"] = ttl
-    if has_until:
-        result["valid_until"] = _validate_timestamp(
-            item["valid_until"], f"replacement {fact_id}.valid_until"
-        )
+    if "valid_until" in item:
+        result["valid_until"] = _validate_timestamp(item["valid_until"], f"replacement {fact_id}.valid_until")
     return result
 
 
@@ -254,15 +242,11 @@ def load_replacement_evidence(path: str | Path) -> dict[str, Any]:
     return normalize_replacement_evidence(data)
 
 
-def apply_replacements(
-    plan: dict[str, Any],
-    evidence: dict[str, Any],
-) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+def apply_replacements(plan: dict[str, Any], evidence: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     normalized = normalize_replacement_evidence(evidence)
     updated = copy.deepcopy(plan)
     facts = _fact_map(updated)
     applied: list[dict[str, Any]] = []
-
     for replacement in normalized["replacements"]:
         fact_id = replacement["fact_id"]
         if fact_id not in facts:
@@ -270,29 +254,28 @@ def apply_replacements(
         fact = facts[fact_id]
         fact["observed_at"] = replacement["observed_at"]
         fact["provenance"] = copy.deepcopy(replacement["provenance"])
-        fact.pop("ttl_seconds", None)
-        fact.pop("valid_until", None)
-        if "ttl_seconds" in replacement:
-            fact["ttl_seconds"] = replacement["ttl_seconds"]
-        if "valid_until" in replacement:
-            fact["valid_until"] = replacement["valid_until"]
+        if "ttl_seconds" in replacement or "valid_until" in replacement:
+            fact.pop("ttl_seconds", None)
+            fact.pop("valid_until", None)
+            if "ttl_seconds" in replacement:
+                fact["ttl_seconds"] = replacement["ttl_seconds"]
+            if "valid_until" in replacement:
+                fact["valid_until"] = replacement["valid_until"]
         applied.append(copy.deepcopy(replacement))
-
     return updated, applied
 
 
-def _affected_by_facts(
-    facts: set[str],
-    topo: list[str],
-    fact_deps: dict[str, set[str]],
-    children: dict[str, set[str]],
-) -> dict[str, set[str]]:
+def _affected_by_facts(facts: set[str], topo: list[str], fact_deps: dict[str, set[str]], children: dict[str, set[str]]) -> dict[str, set[str]]:
+    parents: dict[str, set[str]] = {node_id: set() for node_id in topo}
+    for parent, child_ids in children.items():
+        for child in child_ids:
+            parents[child].add(parent)
     roots: dict[str, set[str]] = {}
     for node_id in topo:
         direct = fact_deps[node_id] & facts
         inherited: set[str] = set()
-        for parent, parent_children in children.items():
-            if node_id in parent_children and parent in roots:
+        for parent in parents[node_id]:
+            if parent in roots:
                 inherited.update(roots[parent])
         combined = direct | inherited
         if combined:
@@ -300,103 +283,36 @@ def _affected_by_facts(
     return roots
 
 
-def build_plan_patch(
-    plan: dict[str, Any],
-    evidence: dict[str, Any],
-    *,
-    as_of: str | None = None,
-) -> dict[str, Any]:
+def build_plan_patch(plan: dict[str, Any], evidence: dict[str, Any], *, as_of: str | None = None) -> dict[str, Any]:
     before = evaluate(plan, as_of=as_of)
     updated_plan, replacements = apply_replacements(plan, evidence)
     after = evaluate(updated_plan, as_of=before["as_of"])
-
     topo, fact_deps, children = _node_graph(plan)
     before_invalidated = {item["id"]: item for item in before["invalidated_nodes"]}
     after_invalidated = {item["id"]: item for item in after["invalidated_nodes"]}
-
-    conservative_facts = {
-        item["fact_id"] for item in replacements if item["change"] in {"changed", "unknown"}
-    }
+    conservative_facts = {item["fact_id"] for item in replacements if item["change"] in {"changed", "unknown"}}
     conservative_roots = _affected_by_facts(conservative_facts, topo, fact_deps, children)
-
     blocked = set(after_invalidated)
     replan = set(conservative_roots) - blocked
     resume = set(before_invalidated) - blocked - replan
-
     operations: list[dict[str, Any]] = []
     for node_id in topo:
         if node_id in blocked:
-            roots = after_invalidated[node_id]["root_stale_facts"]
-            operations.append(
-                {
-                    "op": "blocked",
-                    "node_id": node_id,
-                    "root_facts": roots,
-                    "reason": "freshness_not_restored",
-                }
-            )
+            operations.append({"op": "blocked", "node_id": node_id, "root_facts": after_invalidated[node_id]["root_stale_facts"], "reason": "freshness_not_restored"})
         elif node_id in replan:
-            roots = sorted(conservative_roots[node_id])
-            operations.append(
-                {
-                    "op": "replan",
-                    "node_id": node_id,
-                    "root_facts": roots,
-                    "reason": "replacement_changed_or_unknown",
-                }
-            )
+            operations.append({"op": "replan", "node_id": node_id, "root_facts": sorted(conservative_roots[node_id]), "reason": "replacement_changed_or_unknown"})
         elif node_id in resume:
             prior_roots = set(before_invalidated[node_id]["root_stale_facts"])
-            recovered = sorted(prior_roots - set(after["stale_facts"]))
-            operations.append(
-                {
-                    "op": "resume",
-                    "node_id": node_id,
-                    "root_facts": recovered,
-                    "reason": "freshness_restored_without_change",
-                }
-            )
-
-    if blocked:
-        decision = "blocked"
-    elif replan:
-        decision = "replan_required"
-    elif resume:
-        decision = "resumable"
-    else:
-        decision = "no_change"
-
+            operations.append({"op": "resume", "node_id": node_id, "root_facts": sorted(prior_roots - set(after["stale_facts"])), "reason": "freshness_restored_without_change"})
+    decision = "blocked" if blocked else "replan_required" if replan else "resumable" if resume else "no_change"
     op_nodes = {item["node_id"] for item in operations}
-    replacement_summary = [
-        {
-            "fact_id": item["fact_id"],
-            "evidence_id": item["evidence_id"],
-            "change": item["change"],
-            "observed_at": item["observed_at"],
-            "provenance": item["provenance"],
-        }
-        for item in replacements
-    ]
+    replacement_summary = [{"fact_id": item["fact_id"], "evidence_id": item["evidence_id"], "change": item["change"], "observed_at": item["observed_at"], "provenance": item["provenance"]} for item in replacements]
     return {
-        "schema_version": "0.1",
-        "as_of": after["as_of"],
-        "decision": decision,
-        "summary": {
-            "replacements": len(replacements),
-            "blocked_nodes": len(blocked),
-            "replan_nodes": len(replan),
-            "resume_nodes": len(resume),
-            "unaffected_nodes": len(topo) - len(op_nodes),
-        },
+        "schema_version": "0.1", "as_of": after["as_of"], "decision": decision,
+        "summary": {"replacements": len(replacements), "blocked_nodes": len(blocked), "replan_nodes": len(replan), "resume_nodes": len(resume), "unaffected_nodes": len(topo) - len(op_nodes)},
         "replacements": replacement_summary,
-        "before": {
-            "stale_facts": before["stale_facts"],
-            "invalidated_nodes": [item["id"] for item in before["invalidated_nodes"]],
-        },
-        "after": {
-            "stale_facts": after["stale_facts"],
-            "invalidated_nodes": [item["id"] for item in after["invalidated_nodes"]],
-        },
+        "before": {"stale_facts": before["stale_facts"], "refresh_due_facts": before.get("refresh_due_facts", []), "invalidated_nodes": [item["id"] for item in before["invalidated_nodes"]]},
+        "after": {"stale_facts": after["stale_facts"], "refresh_due_facts": after.get("refresh_due_facts", []), "invalidated_nodes": [item["id"] for item in after["invalidated_nodes"]]},
         "operations": operations,
         "blocked_nodes": [node_id for node_id in topo if node_id in blocked],
         "replan_order": [node_id for node_id in topo if node_id in replan],
@@ -405,63 +321,33 @@ def build_plan_patch(
     }
 
 
-def build_plan_patch_file(
-    plan_path: str | Path,
-    evidence_path: str | Path,
-    *,
-    as_of: str | None = None,
-) -> dict[str, Any]:
-    return build_plan_patch(
-        load_plan(plan_path),
-        load_replacement_evidence(evidence_path),
-        as_of=as_of,
-    )
+def build_plan_patch_file(plan_path: str | Path, evidence_path: str | Path, *, as_of: str | None = None) -> dict[str, Any]:
+    return build_plan_patch(load_plan(plan_path), load_replacement_evidence(evidence_path), as_of=as_of)
 
 
-def run_refresh_adapters(
-    plan: dict[str, Any],
-    adapters: Mapping[str, FactRefreshAdapter],
-    *,
-    as_of: str | None = None,
-) -> dict[str, Any]:
+def run_refresh_adapters(plan: dict[str, Any], adapters: Mapping[str, FactRefreshAdapter], *, as_of: str | None = None) -> dict[str, Any]:
     request_report = build_refresh_requests(plan, as_of=as_of)
     replacements: list[dict[str, Any]] = []
     for request in request_report["requests"]:
         if not request["configured"]:
-            raise FreshPlanRefreshError(
-                f"fact {request['fact_id']} is stale but has no refresh adapter configured"
-            )
+            raise FreshPlanRefreshError(f"fact {request['fact_id']} requires refresh but has no refresh adapter configured")
         adapter_name = request["adapter"]
         adapter = adapters.get(adapter_name)
         if adapter is None:
-            raise FreshPlanRefreshError(
-                f"no refresh adapter registered for {adapter_name!r} "
-                f"(fact {request['fact_id']})"
-            )
+            raise FreshPlanRefreshError(f"no refresh adapter registered for {adapter_name!r} (fact {request['fact_id']})")
         try:
             raw = adapter.refresh(copy.deepcopy(request))
         except Exception as exc:
-            raise FreshPlanRefreshError(
-                f"refresh adapter {adapter_name!r} failed for fact {request['fact_id']}"
-            ) from exc
+            raise FreshPlanRefreshError(f"refresh adapter {adapter_name!r} failed for fact {request['fact_id']}") from exc
         replacement = _normalize_replacement(raw, len(replacements))
         if replacement["fact_id"] != request["fact_id"]:
-            raise FreshPlanRefreshError(
-                f"refresh adapter {adapter_name!r} returned evidence for "
-                f"{replacement['fact_id']!r}, expected {request['fact_id']!r}"
-            )
+            raise FreshPlanRefreshError(f"refresh adapter {adapter_name!r} returned evidence for {replacement['fact_id']!r}, expected {request['fact_id']!r}")
         replacements.append(replacement)
     return {"version": "0.1", "replacements": replacements}
 
 
-def refresh_with_adapters(
-    plan: dict[str, Any],
-    adapters: Mapping[str, FactRefreshAdapter],
-    *,
-    as_of: str | None = None,
-) -> dict[str, Any]:
-    evidence = run_refresh_adapters(plan, adapters, as_of=as_of)
-    return build_plan_patch(plan, evidence, as_of=as_of)
+def refresh_with_adapters(plan: dict[str, Any], adapters: Mapping[str, FactRefreshAdapter], *, as_of: str | None = None) -> dict[str, Any]:
+    return build_plan_patch(plan, run_refresh_adapters(plan, adapters, as_of=as_of), as_of=as_of)
 
 
 def dumps(report: dict[str, Any]) -> str:
@@ -469,30 +355,15 @@ def dumps(report: dict[str, Any]) -> str:
 
 
 def render_requests_text(report: dict[str, Any]) -> str:
-    lines = [
-        "FreshPlan refresh requests",
-        f"as_of: {report['as_of']}",
-        f"decision: {report['decision']}",
-        f"stale facts: {report['summary']['stale_facts']}",
-    ]
+    lines = ["FreshPlan refresh requests", f"as_of: {report['as_of']}", f"decision: {report['decision']}", f"stale facts: {report['summary']['stale_facts']}", f"refresh-due facts: {report['summary']['refresh_due_facts']}"]
     for item in report["requests"]:
         adapter = item["adapter"] or "UNCONFIGURED"
-        lines.append(f"- {item['fact_id']}: adapter={adapter} reason={item['reason']}")
+        lines.append(f"- {item['fact_id']}: adapter={adapter} status={item['current']['status']} reason={item['reason']}")
     return "\n".join(lines)
 
 
 def render_patch_text(report: dict[str, Any]) -> str:
-    lines = [
-        "FreshPlan plan patch",
-        f"as_of: {report['as_of']}",
-        f"decision: {report['decision']}",
-        (
-            "operations: "
-            f"blocked={report['summary']['blocked_nodes']} "
-            f"replan={report['summary']['replan_nodes']} "
-            f"resume={report['summary']['resume_nodes']}"
-        ),
-    ]
+    lines = ["FreshPlan plan patch", f"as_of: {report['as_of']}", f"decision: {report['decision']}", ("operations: " f"blocked={report['summary']['blocked_nodes']} " f"replan={report['summary']['replan_nodes']} " f"resume={report['summary']['resume_nodes']}")]
     for item in report["operations"]:
         roots = ", ".join(item["root_facts"]) or "-"
         lines.append(f"- {item['op']} {item['node_id']}: root facts = {roots}")

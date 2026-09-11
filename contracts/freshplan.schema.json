@@ -10,88 +10,55 @@
     "nodes"
   ],
   "properties": {
-    "version": {
-      "const": "0.1"
-    },
-    "plan_id": {
-      "type": "string",
-      "minLength": 1
-    },
-    "description": {
-      "type": "string"
+    "version": {"const": "0.1"},
+    "plan_id": {"type": "string", "minLength": 1},
+    "description": {"type": "string"},
+    "freshness_policies": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["expire_after_seconds"],
+        "properties": {
+          "refresh_after_seconds": {"type": "number", "minimum": 0},
+          "expire_after_seconds": {"type": "number", "minimum": 0}
+        }
+      }
     },
     "facts": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "id",
-          "observed_at",
-          "provenance"
-        ],
+        "required": ["id", "observed_at", "provenance"],
         "anyOf": [
-          {
-            "required": [
-              "ttl_seconds"
-            ]
-          },
-          {
-            "required": [
-              "valid_until"
-            ]
-          }
+          {"required": ["ttl_seconds"]},
+          {"required": ["valid_until"]},
+          {"required": ["freshness_policy"]}
         ],
         "properties": {
-          "id": {
-            "type": "string",
-            "minLength": 1
-          },
-          "observed_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "ttl_seconds": {
-            "type": "number",
-            "minimum": 0
-          },
-          "valid_until": {
-            "type": "string",
-            "format": "date-time"
-          },
+          "id": {"type": "string", "minLength": 1},
+          "observed_at": {"type": "string", "format": "date-time"},
+          "ttl_seconds": {"type": "number", "minimum": 0},
+          "valid_until": {"type": "string", "format": "date-time"},
+          "freshness_policy": {"type": "string", "minLength": 1},
           "provenance": {
             "type": "object",
             "additionalProperties": false,
-            "required": [
-              "source"
-            ],
+            "required": ["source"],
             "properties": {
-              "source": {
-                "type": "string",
-                "minLength": 1
-              },
-              "reference": {
-                "type": "string"
-              },
-              "observed_by": {
-                "type": "string"
-              }
+              "source": {"type": "string", "minLength": 1},
+              "reference": {"type": "string"},
+              "observed_by": {"type": "string"}
             }
           },
           "refresh": {
             "type": "object",
             "additionalProperties": false,
-            "required": [
-              "adapter"
-            ],
+            "required": ["adapter"],
             "properties": {
-              "adapter": {
-                "type": "string",
-                "minLength": 1
-              },
-              "reference": {
-                "type": "string"
-              }
+              "adapter": {"type": "string", "minLength": 1},
+              "reference": {"type": "string"}
             }
           }
         }
@@ -102,35 +69,16 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "id"
-        ],
+        "required": ["id"],
         "properties": {
-          "id": {
-            "type": "string",
-            "minLength": 1
-          },
-          "title": {
-            "type": "string"
-          },
+          "id": {"type": "string", "minLength": 1},
+          "title": {"type": "string"},
           "depends_on": {
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "facts": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              },
-              "nodes": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
+              "facts": {"type": "array", "items": {"type": "string", "minLength": 1}},
+              "nodes": {"type": "array", "items": {"type": "string", "minLength": 1}}
             }
           }
         }

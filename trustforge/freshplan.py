@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import heapq
 import json
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -41,6 +42,12 @@ def _require_id(value: Any, field: str) -> str:
     return value.strip()
 
 
+def _nonnegative_number(value: Any, field: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+        raise FreshPlanError(f"{field} must be a non-negative number")
+    return float(value)
+
+
 def load_plan(path: str | Path) -> dict[str, Any]:
     plan_path = Path(path)
     text = plan_path.read_text(encoding="utf-8")
@@ -59,25 +66,101 @@ def load_plan(path: str | Path) -> dict[str, Any]:
     return data
 
 
-def _fact_expiry(fact: dict[str, Any], fact_id: str, observed_at: datetime) -> datetime:
+def _normalize_freshness_policies(plan: dict[str, Any]) -> dict[str, dict[str, float | None]]:
+    raw = plan.get("freshness_policies", {})
+    if raw is None:
+        raw = {}
+    if not isinstance(raw, dict):
+        raise FreshPlanError("freshness_policies must be an object")
+
+    policies: dict[str, dict[str, float | None]] = {}
+    for raw_name, raw_policy in raw.items():
+        name = _require_id(raw_name, "freshness_policies key")
+        if not isinstance(raw_policy, dict):
+            raise FreshPlanError(f"freshness policy {name}: policy must be an object")
+        unknown = sorted(set(raw_policy) - {"refresh_after_seconds", "expire_after_seconds"})
+        if unknown:
+            raise FreshPlanError(
+                f"freshness policy {name}: unsupported fields: {', '.join(unknown)}"
+            )
+        if "expire_after_seconds" not in raw_policy:
+            raise FreshPlanError(
+                f"freshness policy {name}: expire_after_seconds is required"
+            )
+        expire = _nonnegative_number(
+            raw_policy["expire_after_seconds"],
+            f"freshness policy {name}.expire_after_seconds",
+        )
+        refresh: float | None = None
+        if "refresh_after_seconds" in raw_policy:
+            refresh = _nonnegative_number(
+                raw_policy["refresh_after_seconds"],
+                f"freshness policy {name}.refresh_after_seconds",
+            )
+            if refresh > expire:
+                raise FreshPlanError(
+                    f"freshness policy {name}: refresh_after_seconds must be <= expire_after_seconds"
+                )
+        policies[name] = {
+            "refresh_after_seconds": refresh,
+            "expire_after_seconds": expire,
+        }
+    return policies
+
+
+def _fact_policy(
+    fact: dict[str, Any],
+    fact_id: str,
+    policies: dict[str, dict[str, float | None]],
+) -> tuple[str | None, dict[str, float | None] | None]:
+    raw_name = fact.get("freshness_policy")
+    if raw_name is None:
+        return None, None
+    name = _require_id(raw_name, f"fact {fact_id}.freshness_policy")
+    if name not in policies:
+        raise FreshPlanError(f"fact {fact_id}: unknown freshness policy: {name}")
+    return name, policies[name]
+
+
+def _fact_expiry(
+    fact: dict[str, Any],
+    fact_id: str,
+    observed_at: datetime,
+    policy: dict[str, float | None] | None,
+) -> datetime:
     candidates: list[datetime] = []
 
     ttl = fact.get("ttl_seconds")
     if ttl is not None:
-        if isinstance(ttl, bool) or not isinstance(ttl, (int, float)) or ttl < 0:
-            raise FreshPlanError(f"fact {fact_id}: ttl_seconds must be a non-negative number")
-        candidates.append(observed_at + timedelta(seconds=float(ttl)))
+        ttl_value = _nonnegative_number(ttl, f"fact {fact_id}.ttl_seconds")
+        candidates.append(observed_at + timedelta(seconds=ttl_value))
 
     valid_until = fact.get("valid_until")
     if valid_until is not None:
         candidates.append(_parse_timestamp(valid_until, f"fact {fact_id}.valid_until"))
 
+    if policy is not None:
+        candidates.append(
+            observed_at + timedelta(seconds=float(policy["expire_after_seconds"] or 0.0))
+        )
+
     if not candidates:
         raise FreshPlanError(
             f"fact {fact_id}: at least one freshness bound is required "
-            "(ttl_seconds or valid_until)"
+            "(ttl_seconds, valid_until, or freshness_policy)"
         )
     return min(candidates)
+
+
+def _fact_refresh_due_at(
+    observed_at: datetime,
+    expires_at: datetime,
+    policy: dict[str, float | None] | None,
+) -> datetime | None:
+    if policy is None or policy.get("refresh_after_seconds") is None:
+        return None
+    candidate = observed_at + timedelta(seconds=float(policy["refresh_after_seconds"] or 0.0))
+    return min(candidate, expires_at)
 
 
 def _normalize_list(value: Any, field: str) -> list[str]:
@@ -88,10 +171,17 @@ def _normalize_list(value: Any, field: str) -> list[str]:
     return [_require_id(item, field) for item in value]
 
 
-def _validate_and_index(plan: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+def _validate_and_index(
+    plan: dict[str, Any],
+) -> tuple[
+    dict[str, dict[str, Any]],
+    dict[str, dict[str, Any]],
+    dict[str, dict[str, float | None]],
+]:
     if str(plan.get("version")) != "0.1":
         raise FreshPlanError("FreshPlan version must be '0.1'")
 
+    policies = _normalize_freshness_policies(plan)
     raw_facts = plan.get("facts", [])
     raw_nodes = plan.get("nodes", [])
     if not isinstance(raw_facts, list) or not isinstance(raw_nodes, list):
@@ -108,6 +198,7 @@ def _validate_and_index(plan: dict[str, Any]) -> tuple[dict[str, dict[str, Any]]
         if not isinstance(provenance, dict):
             raise FreshPlanError(f"fact {fact_id}: provenance must be an object")
         _require_id(provenance.get("source"), f"fact {fact_id}.provenance.source")
+        _fact_policy(fact, fact_id, policies)
         facts[fact_id] = fact
 
     nodes: dict[str, dict[str, Any]] = {}
@@ -136,7 +227,7 @@ def _validate_and_index(plan: dict[str, Any]) -> tuple[dict[str, dict[str, Any]]
         if node_id in node["_node_deps"]:
             raise FreshPlanError(f"node {node_id}: self dependency is not allowed")
 
-    return facts, nodes
+    return facts, nodes, policies
 
 
 def _topological_order(nodes: dict[str, dict[str, Any]]) -> list[str]:
@@ -146,16 +237,16 @@ def _topological_order(nodes: dict[str, dict[str, Any]]) -> list[str]:
         for dep in set(node["_node_deps"]):
             children[dep].append(node_id)
 
-    ready = sorted(node_id for node_id, degree in indegree.items() if degree == 0)
+    ready = [node_id for node_id, degree in indegree.items() if degree == 0]
+    heapq.heapify(ready)
     order: list[str] = []
     while ready:
-        node_id = ready.pop(0)
+        node_id = heapq.heappop(ready)
         order.append(node_id)
-        for child in sorted(children[node_id]):
+        for child in children[node_id]:
             indegree[child] -= 1
             if indegree[child] == 0:
-                ready.append(child)
-                ready.sort()
+                heapq.heappush(ready, child)
 
     if len(order) != len(nodes):
         cyclic = sorted(node_id for node_id, degree in indegree.items() if degree > 0)
@@ -164,7 +255,7 @@ def _topological_order(nodes: dict[str, dict[str, Any]]) -> list[str]:
 
 
 def evaluate(plan: dict[str, Any], *, as_of: str | datetime | None = None) -> dict[str, Any]:
-    facts, nodes = _validate_and_index(plan)
+    facts, nodes, policies = _validate_and_index(plan)
     topo = _topological_order(nodes)
 
     if as_of is None:
@@ -178,11 +269,14 @@ def evaluate(plan: dict[str, Any], *, as_of: str | datetime | None = None) -> di
 
     fact_reports: list[dict[str, Any]] = []
     stale_facts: set[str] = set()
+    refresh_due_facts: set[str] = set()
 
     for fact_id in sorted(facts):
         fact = facts[fact_id]
         observed = _parse_timestamp(fact.get("observed_at"), f"fact {fact_id}.observed_at")
-        expires = _fact_expiry(fact, fact_id, observed)
+        policy_name, policy = _fact_policy(fact, fact_id, policies)
+        expires = _fact_expiry(fact, fact_id, observed, policy)
+        refresh_due_at = _fact_refresh_due_at(observed, expires, policy)
 
         if observed > now:
             status = "stale"
@@ -192,6 +286,10 @@ def evaluate(plan: dict[str, Any], *, as_of: str | datetime | None = None) -> di
             status = "stale"
             reason = "expired"
             age_seconds = (now - observed).total_seconds()
+        elif refresh_due_at is not None and now >= refresh_due_at:
+            status = "refresh_due"
+            reason = "soft_refresh_window_reached"
+            age_seconds = (now - observed).total_seconds()
         else:
             status = "fresh"
             reason = "within_validity_window"
@@ -199,6 +297,8 @@ def evaluate(plan: dict[str, Any], *, as_of: str | datetime | None = None) -> di
 
         if status == "stale":
             stale_facts.add(fact_id)
+        elif status == "refresh_due":
+            refresh_due_facts.add(fact_id)
 
         provenance = fact["provenance"]
         safe_provenance = {"source": provenance["source"]}
@@ -206,17 +306,24 @@ def evaluate(plan: dict[str, Any], *, as_of: str | datetime | None = None) -> di
             if key in provenance:
                 safe_provenance[key] = provenance[key]
 
-        fact_reports.append(
-            {
-                "id": fact_id,
-                "status": status,
-                "reason": reason,
-                "observed_at": _iso(observed),
-                "expires_at": _iso(expires),
-                "age_seconds": round(age_seconds, 3),
-                "provenance": safe_provenance,
+        item: dict[str, Any] = {
+            "id": fact_id,
+            "status": status,
+            "reason": reason,
+            "observed_at": _iso(observed),
+            "expires_at": _iso(expires),
+            "age_seconds": round(age_seconds, 3),
+            "provenance": safe_provenance,
+        }
+        if refresh_due_at is not None:
+            item["refresh_due_at"] = _iso(refresh_due_at)
+        if policy_name is not None and policy is not None:
+            item["freshness_policy"] = {
+                "name": policy_name,
+                "refresh_after_seconds": policy["refresh_after_seconds"],
+                "expire_after_seconds": policy["expire_after_seconds"],
             }
-        )
+        fact_reports.append(item)
 
     invalidated: dict[str, dict[str, Any]] = {}
     for node_id in topo:
@@ -247,19 +354,28 @@ def evaluate(plan: dict[str, Any], *, as_of: str | datetime | None = None) -> di
     replan_order = [node_id for node_id in topo if node_id in invalidated]
     unaffected = [node_id for node_id in topo if node_id not in invalidated]
 
+    if invalidated:
+        decision = "replan_required"
+    elif refresh_due_facts:
+        decision = "refresh_recommended"
+    else:
+        decision = "fresh"
+
     return {
         "schema_version": "0.1",
         "as_of": _iso(now),
-        "decision": "replan_required" if invalidated else "fresh",
+        "decision": decision,
         "summary": {
             "facts_total": len(facts),
             "stale_facts": len(stale_facts),
+            "refresh_due_facts": len(refresh_due_facts),
             "nodes_total": len(nodes),
             "invalidated_nodes": len(invalidated),
             "unaffected_nodes": len(unaffected),
         },
         "facts": fact_reports,
         "stale_facts": sorted(stale_facts),
+        "refresh_due_facts": sorted(refresh_due_facts),
         "invalidated_nodes": [invalidated[node_id] for node_id in replan_order],
         "replan_order": replan_order,
         "unaffected_nodes": unaffected,
@@ -280,10 +396,13 @@ def render_text(report: dict[str, Any]) -> str:
         f"as_of: {report['as_of']}",
         f"decision: {report['decision']}",
         f"stale facts: {report['summary']['stale_facts']} / {report['summary']['facts_total']}",
+        f"refresh-due facts: {report['summary']['refresh_due_facts']} / {report['summary']['facts_total']}",
         f"invalidated nodes: {report['summary']['invalidated_nodes']} / {report['summary']['nodes_total']}",
     ]
     if report["stale_facts"]:
         lines.append("stale_fact_ids: " + ", ".join(report["stale_facts"]))
+    if report["refresh_due_facts"]:
+        lines.append("refresh_due_fact_ids: " + ", ".join(report["refresh_due_facts"]))
     if report["replan_order"]:
         lines.append("replan_order: " + " -> ".join(report["replan_order"]))
         for node in report["invalidated_nodes"]:

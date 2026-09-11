@@ -1,0 +1,37 @@
+version: "0.1"
+plan_id: fulfillment-with-policy
+
+freshness_policies:
+  volatile:
+    refresh_after_seconds: 300
+    expire_after_seconds: 900
+  slow:
+    refresh_after_seconds: 1800
+    expire_after_seconds: 3600
+
+facts:
+  - id: inventory
+    observed_at: "2026-09-11T09:20:00Z"
+    freshness_policy: volatile
+    provenance:
+      source: inventory-api
+      reference: inventory:SKU-1
+    refresh:
+      adapter: inventory-api
+      reference: inventory:SKU-1
+
+  - id: fx
+    observed_at: "2026-09-11T09:20:00Z"
+    freshness_policy: slow
+    provenance:
+      source: fx-api
+      reference: USD-VND
+
+nodes:
+  - id: reorder
+    depends_on:
+      facts: [inventory]
+
+  - id: price
+    depends_on:
+      facts: [fx]

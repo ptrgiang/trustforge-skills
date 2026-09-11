@@ -154,6 +154,39 @@ jobs:
           status=$?
           set -e
           test "$status" -eq 6
+      - name: FreshPlan freshness-policy smoke test
+        run: |
+          trustforge freshplan check \
+            --plan examples/freshplan/freshness-policies.yaml \
+            --as-of "2026-09-11T09:30:00Z" \
+            --json > .artifacts/freshplan-policy.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path(".artifacts/freshplan-policy.json").read_text())
+          assert report["decision"] == "refresh_recommended"
+          assert report["refresh_due_facts"] == ["inventory"]
+          assert report["stale_facts"] == []
+          assert report["replan_order"] == []
+          print("FreshPlan freshness policy smoke test passed")
+          PY
+      - name: FreshPlan large-graph benchmark gate
+        run: |
+          trustforge freshplan benchmark \
+            --nodes 1000 5000 10000 \
+            --repeats 2 \
+            --max-median-ms 5000 \
+            --json > .artifacts/freshplan-benchmark.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path(".artifacts/freshplan-benchmark.json").read_text())
+          assert report["largest_case"]["nodes"] == 10000
+          assert report["largest_case"]["invalidated_nodes"] == 1000
+          print("FreshPlan large-graph benchmark gate passed")
+          PY
       - name: Package development version consistency
         run: |
           python - <<'PY'
@@ -163,7 +196,7 @@ jobs:
 
           pyproject = Path("pyproject.toml").read_text()
           version = re.search(r'^version = "([^"]+)"$', pyproject, re.MULTILINE).group(1)
-          assert version == "0.5.0.dev1"
+          assert version == "0.5.0.dev2"
           assert trustforge.__version__ == version
           print(f"development version consistent: {version}")
           PY

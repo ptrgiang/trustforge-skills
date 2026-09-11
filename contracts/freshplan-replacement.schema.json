@@ -24,18 +24,6 @@
           "provenance",
           "change"
         ],
-        "anyOf": [
-          {
-            "required": [
-              "ttl_seconds"
-            ]
-          },
-          {
-            "required": [
-              "valid_until"
-            ]
-          }
-        ],
         "properties": {
           "fact_id": {
             "type": "string",
