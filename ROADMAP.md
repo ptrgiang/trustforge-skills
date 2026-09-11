@@ -176,14 +176,20 @@ Evidence-backed completion contracts for autonomous agents.
 - [x] Example contract/evidence bundle and unit tests
 - [x] Adversarial eval fixture for stale and self-claimed evidence
 - [x] Shared preflight gates for strict, partial, freshness, and source-trust behavior
-- [ ] Direct evidence adapters for common developer workflows
+- [x] Generic command exit-code evidence adapter with bounded `shell=False` execution
+- [x] JSON artifact field adapter with SHA-256/size provenance
+- [x] Evidence-bundle merge helper with duplicate-key rejection
+- [x] Evidence collection CLI and shared-preflight integration
+- [x] Command provenance omits raw argv/stdout/stderr to reduce accidental secret disclosure
+- [ ] Dedicated pytest / GitHub Actions evidence adapters
+- [ ] Package-manifest / API-diff evidence adapters
 - [ ] Signed evidence attestations
 - [ ] Release hardening for `v0.7.0`
 
 ### CommitmentGuard research backlog
 
 - [ ] Natural-language commitment extraction
-- [ ] Pytest / GitHub Actions / package-manifest / API-diff adapters
+- [ ] Browser-task evidence adapters
 - [ ] Temporal commitments and deadlines beyond evidence freshness
 - [ ] Hierarchical commitments for multi-agent workflows
 - [ ] Completion-language policy integration
