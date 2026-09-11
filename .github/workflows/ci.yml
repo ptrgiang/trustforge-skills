@@ -233,6 +233,32 @@ jobs:
           assert report["failure_signature_match"] is True
           print("ReproCapsule replay verification gate passed")
           PY
+      - name: ReproCapsule container export gate
+        run: |
+          rm -rf .artifacts/reprocapsule-container
+          trustforge reprocapsule export-container \
+            --capsule .artifacts/reprocapsule \
+            --output .artifacts/reprocapsule-container \
+            --json > .artifacts/reprocapsule-container-report.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path(".artifacts/reprocapsule-container-report.json").read_text())
+          stored = json.loads(Path(".artifacts/reprocapsule-container/container-export.json").read_text())
+          dockerfile = Path(".artifacts/reprocapsule-container/Dockerfile").read_text()
+          devcontainer = json.loads(Path(".artifacts/reprocapsule-container/.devcontainer/devcontainer.json").read_text())
+          assert report == stored
+          assert report["decision"] == "exported"
+          assert report["base_image"].startswith("python:")
+          assert report["safety"]["integrity_verified_before_export"] is True
+          assert report["safety"]["container_built_during_export"] is False
+          assert report["safety"]["container_executed_during_export"] is False
+          assert "USER repro" in dockerfile
+          assert 'CMD ["python", "parser_demo.py", "fixtures/input.json"]' in dockerfile
+          assert devcontainer["remoteUser"] == "repro"
+          assert Path(".artifacts/reprocapsule-container/inputs/parser_demo.py").is_file()
+          print("ReproCapsule container export gate passed")
+          PY
       - name: ReproCapsule tamper block gate
         run: |
           cp -R .artifacts/reprocapsule .artifacts/reprocapsule-tampered
@@ -254,7 +280,7 @@ jobs:
           import trustforge
           pyproject = Path("pyproject.toml").read_text()
           version = re.search(r'^version = "([^"]+)"$', pyproject, re.MULTILINE).group(1)
-          assert version == "0.6.0.dev1"
+          assert version == "0.6.0.dev2"
           assert trustforge.__version__ == version
           print(f"development version consistent: {version}")
           PY
