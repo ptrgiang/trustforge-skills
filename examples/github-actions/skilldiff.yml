@@ -1,0 +1,30 @@
+name: TrustForge SkillDiff
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  skilldiff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Audit candidate skill
+        uses: ptrgiang/trustforge-skills@v0
+        with:
+          before: fixtures/trusted-skill
+          after: skills/candidate-skill
+          fail-on: medium
+          format: sarif
+          report-path: artifacts/skilldiff.sarif
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trustforge-skilldiff
+          path: artifacts/skilldiff.sarif
+          if-no-files-found: ignore

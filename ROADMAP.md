@@ -22,20 +22,26 @@ TrustForge is intentionally starting narrow: prove the trust primitives before e
 - [x] SARIF 2.1.0 output
 - [x] Adversarial trigger-expansion eval fixture
 
-## v0.3 — SkillDiff CI + structured detection
+## v0.3 — Structured analysis and adoption
 
-- [x] Python AST detector without executing candidate code
-- [x] Import/alias resolution for network and subprocess calls
-- [x] `open()` mode-aware filesystem detection
-- [x] AST secret-like environment-variable detection
-- [x] AST findings integrated into the main SkillDiff report
-- [x] AST findings exported to SARIF
-- [x] Adversarial regex-vs-AST eval fixture
+- [x] Python AST detector
+- [x] Alias-aware structured capability detection
+- [x] AST evidence provenance and parse-error reporting
+- [x] AST-backed SARIF findings
+- [x] Adversarial AST alias eval fixture
 - [x] Reusable composite GitHub Action
-- [x] Self-hosted action smoke test in CI
-- [ ] JavaScript/TypeScript AST detector
+- [x] Self-test the GitHub Action with `uses: ./`
+- [x] Changelog and release notes
+- [x] Copy-paste GitHub Actions example
+- [x] Floating stable `v0` action line
+
+### SkillDiff research backlog
+
+- [ ] JavaScript/TypeScript structured detectors
 - [ ] Transitive dependency capability analysis
 - [ ] Signed baseline manifests
+- [ ] Sandboxed behavioral canary replay
+- [ ] Richer trigger-scope models and benchmark datasets
 
 ## v0.4 — DataLease
 
@@ -66,17 +72,10 @@ Portable failure reproduction for coding agents.
 - Docker/devcontainer export;
 - replay verification.
 
-## Research track
-
-Longer-term experiments that should not block the core CLI:
-
-- sandboxed behavioral canary replay;
-- transitive package risk/capability inference;
-- cross-runtime skill trust contracts;
-- benchmarks for precision/recall and false-positive resistance.
-
 ## v1.0 goal
 
-A stable, agent-agnostic trust layer with reusable contracts, evidence formats, evals, CI integrations, and adapters for major coding/agent runtimes.
+A stable, agent-agnostic trust layer with reusable contracts, evidence formats, evals, and adapters for major coding/agent runtimes.
 
-We will maintain prior-art notes and avoid claims such as “first ever” unless they can be supported. The goal is useful open infrastructure, not novelty marketing.
+## Research track
+
+We maintain prior-art notes and avoid claims such as “first ever” unless they can be supported. The goal is useful open infrastructure, not novelty marketing.
