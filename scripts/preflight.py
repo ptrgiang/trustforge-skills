@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -138,6 +139,36 @@ def main() -> int:
         raise RuntimeError("CommitmentGuard command adapter source kind mismatch")
     if command_observation["source"]["stdout_captured"] or command_observation["source"]["stderr_captured"]:
         raise RuntimeError("CommitmentGuard command adapter unexpectedly captured output")
+
+    if os.environ.get("GITHUB_ACTIONS", "").lower() == "true":
+        github_evidence = subprocess.check_output(
+            [
+                python,
+                "-m",
+                "trustforge.cli",
+                "evidence",
+                "github-actions",
+                "--key",
+                "ci.passed",
+                "--conclusion",
+                "success",
+                "--observed-at",
+                "2026-09-11T14:55:00Z",
+            ],
+            cwd=ROOT,
+            text=True,
+        )
+        github_bundle = json.loads(github_evidence)
+        github_observation = github_bundle["observations"]["ci.passed"]
+        github_source = github_observation["source"]
+        if github_observation["value"] is not True:
+            raise RuntimeError("CommitmentGuard GitHub Actions adapter did not map success to true")
+        if github_source["kind"] != "github-actions":
+            raise RuntimeError("CommitmentGuard GitHub Actions source kind mismatch")
+        if github_source["run_id"] != os.environ.get("GITHUB_RUN_ID"):
+            raise RuntimeError("CommitmentGuard GitHub Actions run ID provenance mismatch")
+        if any("token" in key.lower() for key in github_source):
+            raise RuntimeError("CommitmentGuard GitHub Actions provenance unexpectedly contains a token field")
 
     with tempfile.TemporaryDirectory() as evidence_tmp:
         artifact = Path(evidence_tmp) / "coverage.json"
