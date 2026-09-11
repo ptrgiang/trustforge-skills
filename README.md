@@ -23,7 +23,7 @@ TrustForge does not try to be another agent framework. It sits around agent work
 | **DataLease** | Sends only the minimum necessary data to approved destinations | Released |
 | **FreshPlan** | Detects aging evidence and re-plans only affected branches | **v0.5.0** |
 | **CommitmentGuard** | Requires evidence before completion claims | MVP |
-| **ReproCapsule** | Packages failures, verifies replay, and exports portable container contexts | **v0.6 in development** |
+| **ReproCapsule** | Packages failures, verifies replay, exports container contexts, and gates trace redaction | **v0.6 in development** |
 
 ## Who this is for
 
@@ -66,22 +66,11 @@ trustforge freshplan check \
 
 ### Package, verify, and export a failure
 
-Build without executing anything:
-
 ```bash
 trustforge reprocapsule build \
   --spec examples/reprocapsule/example-spec.yaml \
   --output .artifacts/reprocapsule
 ```
-
-Verify integrity only:
-
-```bash
-trustforge reprocapsule replay \
-  --capsule .artifacts/reprocapsule
-```
-
-Explicitly execute and verify reproduction:
 
 ```bash
 trustforge reprocapsule replay \
@@ -90,15 +79,22 @@ trustforge reprocapsule replay \
   --fail-on-divergence
 ```
 
-Export a Docker/devcontainer build context:
-
 ```bash
 trustforge reprocapsule export-container \
   --capsule .artifacts/reprocapsule \
   --output .artifacts/reprocapsule-container
 ```
 
-The export contains a `Dockerfile`, `.dockerignore`, `.devcontainer/devcontainer.json`, the verified capsule manifest, sanitized trace when present, and verified packaged inputs. Export verifies capsule integrity first and does not build or run Docker automatically.
+### Gate trace redaction
+
+```bash
+trustforge reprocapsule benchmark-redaction \
+  --dataset evals/reprocapsule/redaction-benchmark.jsonl \
+  --min-secret-recall 1.0 \
+  --min-clean-specificity 1.0
+```
+
+The benchmark uses synthetic adversarial traces. `secret_recall` measures how many secret-bearing cases are fully sanitized. `clean_specificity` measures how many clean near-miss cases remain unchanged. Reports identify failed case IDs without echoing the synthetic secret values.
 
 ## ReproCapsule v0.6 development
 
@@ -117,20 +113,20 @@ portable capsule
       ↓
 integrity preflight
       ↓
-explicit --execute gate
+explicit replay gate
       ↓
-exit-code + failure-signature verification
-      ↓
-ready / reproduced / diverged / blocked
+reproduced / diverged / blocked
       ↓
 verified Docker/devcontainer export
+      ↓
+adversarial redaction regression gate
 ```
 
 The generated container context uses a non-root runtime user and derives a Python major/minor base image from the captured runtime fingerprint. It is a portability aid, not a guarantee that all native/system dependencies are reproduced.
 
 Important boundary: neither the temporary replay workspace nor the generated container definition is claimed to be a complete security sandbox. Untrusted capsules still require hardened isolation and an appropriate container/runtime policy.
 
-Next on the v0.6 line: adversarial redaction fixtures, stronger containerized replay isolation, and release hardening.
+Next on the v0.6 line: containerized replay isolation and release hardening.
 
 See [`skills/reprocapsule/SKILL.md`](skills/reprocapsule/SKILL.md) and [`ROADMAP.md`](ROADMAP.md).
 
@@ -157,12 +153,11 @@ For security-sensitive workflows, pin the full release commit SHA instead of the
 
 ## What TrustForge does not claim
 
-- Classifier benchmarks are regression fixtures, not compliance certifications.
+- Classifier and redaction benchmarks are regression fixtures, not compliance certifications.
 - Performance gates are regression alarms, not production SLAs.
 - Freshness policies cannot prove that a domain-specific TTL is correct.
 - Static capability detection cannot prove runtime behavior.
-- Redaction reduces disclosure but does not automatically make data anonymous.
-- ReproCapsule sanitization is a defensive baseline, not proof that arbitrary secrets can never appear.
+- Redaction reduces disclosure but does not prove arbitrary secrets can never appear.
 - ReproCapsule replay and generated container definitions are not complete security sandboxes.
 - Container export does not yet capture arbitrary OS/native dependency locks.
 
@@ -172,7 +167,7 @@ The goal is useful infrastructure with measurable boundaries, not perfect detect
 
 TrustForge is still pre-1.0 and is being developed in the open. The repository includes implementation, eval fixtures, known limitations, release checklists, benchmark gates, and design tradeoffs as they evolve.
 
-The active milestone is **ReproCapsule v0.6**. Safe packaging, integrity-gated replay, and Docker/devcontainer export are now implemented.
+The active milestone is **ReproCapsule v0.6**. Safe packaging, integrity-gated replay, container export, and adversarial redaction regression gates are now implemented.
 
 ## Design principles
 
@@ -199,7 +194,7 @@ The active milestone is **ReproCapsule v0.6**. Safe packaging, integrity-gated r
 
 ## Release and compatibility
 
-- Development package version on `main`: **0.6.0.dev2**
+- Development package version on `main`: **0.6.0.dev3**
 - Latest stable release: **v0.5.0**
 - Floating stable GitHub Action ref: **`v0`**
 - License: Apache-2.0
