@@ -1,42 +1,32 @@
-# DataLease classifier evals
+# DataLease evals
 
-This directory contains deterministic, synthetic evaluation fixtures for DataLease field classification.
+DataLease includes deterministic synthetic regression fixtures for classifier quality.
 
-## Baseline dataset
-
-`classifier-benchmark.jsonl` currently contains 30 cases spanning:
-
-- email, phone, address, name, date-of-birth, government-id, payment, IP, and secret labels;
-- negative fields that should remain unclassified;
-- adversarial metadata such as `email_verified` and `email_domain`;
-- context that the built-in heuristics intentionally do not yet understand, such as sensitive values embedded in free text.
-
-All values are synthetic. Example domains and documentation IP ranges are used where possible.
-
-Run the benchmark:
+## Built-in benchmark
 
 ```bash
 trustforge datalease benchmark \
   --dataset evals/datalease/classifier-benchmark.jsonl
 ```
 
-Machine-readable output:
+The primary 30-case fixture intentionally retains known mismatches so CI measures regression instead of presenting a perfect score.
 
-```bash
-trustforge datalease benchmark \
-  --dataset evals/datalease/classifier-benchmark.jsonl \
-  --json
+Release baseline for v0.4.0:
+
+```text
+precision >= 0.90
+recall    >= 0.85
 ```
 
-Use thresholds in CI:
+## Multilingual/domain smoke fixture
 
 ```bash
 trustforge datalease benchmark \
-  --dataset evals/datalease/classifier-benchmark.jsonl \
+  --dataset evals/datalease/classifier-benchmark-multilingual.jsonl \
   --min-precision 0.90 \
-  --min-recall 0.85
+  --min-recall 0.90
 ```
 
-The current built-in baseline is intentionally non-perfect. The dataset includes known false positives and false negatives so the benchmark documents limitations instead of hiding them.
+This small fixture adds Vietnamese phone/email examples, IPv6, credential-style field names, payment/government-id paths, and benign values that resemble identifiers.
 
-This small synthetic set is a regression suite, not evidence of production-grade PII detection and not a compliance benchmark. Larger multilingual and domain-specific datasets are future work.
+These datasets are synthetic regression fixtures. They are not representative population samples and MUST NOT be presented as privacy/compliance certification benchmarks.

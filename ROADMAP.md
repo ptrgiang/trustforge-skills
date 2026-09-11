@@ -46,7 +46,7 @@ TrustForge is intentionally starting narrow: prove the trust primitives before e
 
 ## v0.4 — DataLease
 
-Purpose-bound minimum-necessary data projection before tool/API/MCP calls.
+Purpose- and destination-bound minimum-necessary data projection before tool/API/MCP calls.
 
 - [x] Purpose-bound transfer authorization
 - [x] Field-path allow/redact/deny rules
@@ -61,18 +61,19 @@ Purpose-bound minimum-necessary data projection before tool/API/MCP calls.
 - [x] Reference sync/async HTTP interception adapter
 - [x] Reference sync/async MCP tool-call adapter
 - [x] Destination binding for HTTP scheme/host/method and MCP tool patterns
-- [x] Pluggable trusted-classifier interface
-- [x] Classifier provenance (`detector`, `confidence`, `reason`) in value-free audit evidence
-- [x] Classifier failure is fail-closed
-- [x] Synthetic adversarial precision/recall benchmark fixture
-- [x] `trustforge datalease benchmark` CLI and CI regression thresholds
+- [x] Pluggable classifier interface with provenance/confidence
+- [x] Fail-closed classifier plugin errors
+- [x] Primary precision/recall benchmark fixture and CI thresholds
+- [x] Multilingual/domain regression fixture
+- [x] Built-in classifier label/version contract
+- [x] Release notes and release checklist
 
-### DataLease release backlog
+### DataLease research backlog
 
 - [ ] Larger multilingual/domain-specific benchmark datasets
-- [ ] Governance for classifier label namespaces and versioning
-- [ ] Concrete adapters for selected popular MCP/HTTP client stacks
-- [ ] Release `v0.4.0`
+- [ ] Govern HTTP query parameters, headers, multipart, and streaming payloads
+- [ ] Concrete integrations for selected popular HTTP/MCP client stacks
+- [ ] Classifier sandboxing/isolation model
 
 ## v0.5 — FreshPlan
 

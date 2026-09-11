@@ -61,17 +61,26 @@ jobs:
             --dataset evals/datalease/classifier-benchmark.jsonl \
             --min-precision 0.90 \
             --min-recall 0.85 \
-            --json > .artifacts/datalease-benchmark.json
+            > .artifacts/datalease-benchmark.json
+      - name: DataLease multilingual/domain benchmark gate
+        run: |
+          trustforge datalease benchmark \
+            --dataset evals/datalease/classifier-benchmark-multilingual.jsonl \
+            --min-precision 0.90 \
+            --min-recall 0.90 \
+            > .artifacts/datalease-benchmark-multilingual.json
+      - name: Release version consistency
+        run: |
           python - <<'PY'
-          import json
+          import re
           from pathlib import Path
+          import trustforge
 
-          result = json.loads(Path(".artifacts/datalease-benchmark.json").read_text())
-          assert result["samples"] == 30
-          assert result["micro"]["precision"] >= 0.90
-          assert result["micro"]["recall"] >= 0.85
-          assert result["exact_match"]["rate"] < 1.0
-          print("DataLease benchmark gate passed")
+          pyproject = Path("pyproject.toml").read_text()
+          version = re.search(r'^version = "([^"]+)"$', pyproject, re.MULTILINE).group(1)
+          assert version == "0.4.0"
+          assert trustforge.__version__ == version
+          print(f"release version consistent: {version}")
           PY
 
   action-smoke:

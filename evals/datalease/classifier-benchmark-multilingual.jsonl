@@ -1,0 +1,12 @@
+{"id":"vi-email","path":"customer.email","value":"lan.nguyen@example.vn","expected":["pii.email"]}
+{"id":"vi-phone-plus84","path":"customer.phone","value":"+84 912 345 678","expected":["pii.phone"]}
+{"id":"vi-phone-local","path":"customer.mobile","value":"0912 345 678","expected":["pii.phone"]}
+{"id":"ipv6","path":"client.ip","value":"2001:db8::1","expected":["network.ip"]}
+{"id":"aws-secret-access-key-path","path":"aws.secret_access_key","value":"example-placeholder","expected":["secret"]}
+{"id":"bearer-auth-path","path":"request.authorization","value":"Bearer example-placeholder","expected":["secret"]}
+{"id":"client-secret-path","path":"oauth.client_secret","value":"example-placeholder","expected":["secret"]}
+{"id":"passport-path","path":"traveler.passport","value":"B12345678","expected":["pii.government_id"]}
+{"id":"card-number-path","path":"payment.card_number","value":"4111111111111111","expected":["pii.payment"]}
+{"id":"benign-order-id","path":"order.id","value":"VN-2026-001","expected":[]}
+{"id":"benign-iso-date","path":"order.created_at","value":"2026-09-11","expected":[]}
+{"id":"benign-sku","path":"item.sku","value":"84-0912345678","expected":[]}
