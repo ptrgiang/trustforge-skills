@@ -9,6 +9,7 @@ from pathlib import Path
 from trustforge.commitment_evidence import (
     CommitmentEvidenceError,
     collect_command_exit,
+    collect_github_actions,
     collect_json_artifact,
     collect_pytest,
     merge_bundles,
@@ -98,6 +99,66 @@ class CommitmentEvidenceTests(unittest.TestCase):
         bundle = collect_pytest("tests.passed", ["tests"], runner=runner)
         self.assertFalse(bundle["observations"]["tests.passed"]["value"])
         self.assertEqual(bundle["observations"]["tests.passed"]["source"]["exit_code"], 1)
+
+    def test_github_actions_success_uses_runtime_metadata_without_token(self):
+        env = {
+            "GITHUB_ACTIONS": "true",
+            "GITHUB_REPOSITORY": "ptrgiang/trustforge-skills",
+            "GITHUB_RUN_ID": "12345",
+            "GITHUB_RUN_ATTEMPT": "2",
+            "GITHUB_WORKFLOW": "CI",
+            "GITHUB_JOB": "test",
+            "GITHUB_SHA": "abcdef123456",
+            "GITHUB_REF": "refs/heads/main",
+            "GITHUB_EVENT_NAME": "push",
+            "GITHUB_SERVER_URL": "https://github.com",
+            "GITHUB_TOKEN": "must-not-appear",
+        }
+        bundle = collect_github_actions(
+            "ci.passed",
+            "success",
+            observed_at="2026-09-11T14:55:00Z",
+            environment=env,
+        )
+        observation = bundle["observations"]["ci.passed"]
+        source = observation["source"]
+        serialized = json.dumps(bundle)
+        self.assertTrue(observation["value"])
+        self.assertEqual(source["kind"], "github-actions")
+        self.assertEqual(source["conclusion"], "success")
+        self.assertEqual(source["run_id"], "12345")
+        self.assertEqual(source["run_attempt"], "2")
+        self.assertEqual(source["workflow"], "CI")
+        self.assertEqual(source["job"], "test")
+        self.assertEqual(source["sha"], "abcdef123456")
+        self.assertEqual(
+            source["run_url"],
+            "https://github.com/ptrgiang/trustforge-skills/actions/runs/12345",
+        )
+        self.assertNotIn("must-not-appear", serialized)
+        self.assertNotIn("GITHUB_TOKEN", serialized)
+
+    def test_github_actions_non_success_maps_false(self):
+        env = {
+            "GITHUB_ACTIONS": "true",
+            "GITHUB_REPOSITORY": "owner/repo",
+            "GITHUB_RUN_ID": "1",
+            "GITHUB_RUN_ATTEMPT": "1",
+            "GITHUB_WORKFLOW": "CI",
+            "GITHUB_JOB": "test",
+            "GITHUB_SHA": "abc",
+        }
+        bundle = collect_github_actions("ci.passed", "failure", environment=env)
+        self.assertFalse(bundle["observations"]["ci.passed"]["value"])
+
+    def test_github_actions_fails_closed_outside_actions(self):
+        with self.assertRaises(CommitmentEvidenceError):
+            collect_github_actions("ci.passed", "success", environment={})
+
+    def test_github_actions_fails_closed_when_required_metadata_missing(self):
+        env = {"GITHUB_ACTIONS": "true", "GITHUB_REPOSITORY": "owner/repo"}
+        with self.assertRaises(CommitmentEvidenceError):
+            collect_github_actions("ci.passed", "success", environment=env)
 
     def test_json_artifact_adapter_extracts_value_and_hashes_source(self):
         with tempfile.TemporaryDirectory() as tmp:
