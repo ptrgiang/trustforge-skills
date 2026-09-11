@@ -2,7 +2,7 @@
 
 Status: v0.6 development
 
-ReproCapsule packages failure context into a portable, sanitized artifact and can verify whether the declared failure still reproduces.
+ReproCapsule packages failure context into a portable, sanitized artifact, verifies whether the declared failure still reproduces, and can export a verified capsule into a Docker/devcontainer build context.
 
 ## Build
 
@@ -32,45 +32,31 @@ trustforge reprocapsule replay \
   --fail-on-divergence
 ```
 
-Replay follows this sequence:
+Replay verifies packaged SHA-256 and sizes before execution, copies inputs into a temporary workspace, uses `shell=False` with reduced environment inheritance, then compares the observed exit code and optional literal failure signature.
 
-```text
-manifest
-   ↓
-verify packaged SHA-256 + sizes
-   ↓
-copy inputs into an isolated temporary workspace
-   ↓
-explicit --execute gate
-   ↓
-run command with shell=False and a minimal environment
-   ↓
-compare exit code + literal failure signature
-   ↓
-reproduced / diverged
+Decisions are `ready`, `reproduced`, `diverged`, or `blocked`.
+
+## Container export
+
+```bash
+trustforge reprocapsule export-container \
+  --capsule .artifacts/reprocapsule \
+  --output .artifacts/reprocapsule-container
 ```
 
-A tampered or missing packaged input blocks execution before the command is started.
+Export first verifies capsule integrity. A successful export includes:
 
-## Decisions
+- `Dockerfile`;
+- `.dockerignore`;
+- `.devcontainer/devcontainer.json`;
+- `reprocapsule.json`;
+- `container-export.json`;
+- verified packaged inputs;
+- the sanitized trace when present.
 
-- `ready`: integrity passed, but execution was not explicitly requested.
-- `reproduced`: all declared replay expectations matched.
-- `diverged`: replay executed but exit code and/or failure signature did not match.
-- `blocked`: integrity or replay prerequisites failed before execution.
+The Python base image is derived from the captured runtime major/minor version. The generated Dockerfile uses a non-root `repro` user and preserves the declared replay command as JSON-array `CMD`.
 
-## Capsule contents
-
-A capsule can contain:
-
-- `reprocapsule.json`: portable manifest;
-- copied failing inputs explicitly listed by the spec;
-- SHA-256 and size metadata for packaged inputs;
-- sanitized failure trace;
-- OS, architecture, Python version, and implementation fingerprint;
-- environment variable **presence** metadata for explicitly named variables.
-
-Raw environment values are not captured.
+Container export deliberately does **not** build or execute Docker. It also does not inject environment values or secrets.
 
 ## Safety boundaries
 
@@ -82,16 +68,17 @@ ReproCapsule fails closed when:
 - required inputs or trace files are missing;
 - packaged files fail hash/size verification;
 - replay has neither an expected exit code nor a failure signature;
+- container export is requested from a tampered capsule;
+- the export output would overwrite the capsule directory or one of its parent directories;
 - unknown spec fields are supplied.
 
-Replay execution is deliberately explicit. The current temporary workspace is **not a security sandbox**. The command can still access resources available to the operating-system process. The replay runner reduces accidental environment inheritance and uses `shell=False`, but untrusted capsules should not be executed outside a real sandbox/container.
+The temporary replay workspace and generated container definition are **not claimed to be complete security sandboxes**. Untrusted capsules still require a hardened runtime/container policy. The current container export also does not capture arbitrary native/system dependency locks.
 
 Trace and replay-output sanitization handles common secret assignments, bearer tokens, GitHub-style tokens, OpenAI-style `sk-` tokens, and AWS access-key identifiers. This is a defensive baseline, not a guarantee that arbitrary secrets cannot appear.
 
 ## Still planned
 
-- Dockerfile/devcontainer export;
-- stronger sandboxed replay;
+- stronger sandboxed/containerized replay;
 - adversarial trace-redaction fixtures;
 - dependency/environment lock capture;
 - signed capsule manifests.
