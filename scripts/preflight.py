@@ -89,9 +89,9 @@ def main() -> int:
         "--dataset",
         "evals/reprocapsule/redaction-benchmark.jsonl",
         "--min-secret-recall",
-        "0.90",
+        "1.0",
         "--min-clean-specificity",
-        "0.833333",
+        "1.0",
     )
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -129,6 +129,25 @@ def main() -> int:
         report = json.loads(output)
         if report["decision"] != "reproduced":
             raise RuntimeError(f"ReproCapsule replay did not reproduce: {report['decision']}")
+
+        container_preflight = subprocess.check_output(
+            [
+                python,
+                "-m",
+                "trustforge.cli",
+                "reprocapsule",
+                "replay-container",
+                "--capsule",
+                str(capsule),
+                "--json",
+            ],
+            cwd=ROOT,
+            text=True,
+        )
+        container_report = json.loads(container_preflight)
+        if container_report["decision"] != "ready" or container_report["executed"]:
+            raise RuntimeError("ReproCapsule container preflight unexpectedly executed Docker")
+
         run(
             python,
             "-m",
