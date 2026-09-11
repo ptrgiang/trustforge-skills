@@ -104,6 +104,20 @@ def private_key_pem(key: Ed25519PrivateKey) -> bytes:
     )
 
 
+def _registry_key_path(registry_path: Path, public_key_file: str) -> Path:
+    candidate = Path(public_key_file)
+    if candidate.is_absolute():
+        raise AttestationError("trust registry public_key_file must be relative")
+
+    registry_root = registry_path.parent.resolve()
+    resolved = (registry_root / candidate).resolve()
+    try:
+        resolved.relative_to(registry_root)
+    except ValueError as exc:
+        raise AttestationError("trust registry public_key_file must stay inside the registry directory") from exc
+    return resolved
+
+
 def load_trust_registry(path: str | Path) -> dict[tuple[str, str], Ed25519PublicKey]:
     registry_path = Path(path)
     try:
@@ -136,7 +150,7 @@ def load_trust_registry(path: str | Path) -> dict[tuple[str, str], Ed25519Public
         identity = (issuer, key_id)
         if identity in trusted:
             raise AttestationError(f"duplicate trust registry key: issuer={issuer!r} key_id={key_id!r}")
-        key_path = (registry_path.parent / public_key_file).resolve()
+        key_path = _registry_key_path(registry_path, public_key_file)
         try:
             key_bytes = key_path.read_bytes()
         except OSError as exc:
@@ -215,6 +229,7 @@ def _bundle_observation(bundle: Mapping[str, Any], observation_key: str) -> tupl
     observation = observations.get(observation_key)
     if not isinstance(observation, dict) or "value" not in observation:
         raise AttestationError(f"evidence observation not found or invalid: {observation_key}")
+
     provenance: dict[str, Any] = {}
     if "source" in observation:
         if not isinstance(observation["source"], dict):
