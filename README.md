@@ -15,12 +15,6 @@ It started from a simple question:
 
 TrustForge does not try to be another agent framework. It sits around agent workflows and makes important trust boundaries visible, testable, and auditable.
 
-## The problem
-
-Agents can already read and write files, call APIs and tools, use credentials, send structured data to external systems, keep long-running plans alive, and claim that a task is complete.
-
-TrustForge is being built around the trust boundaries those actions create.
-
 ## What is in the repo today
 
 | Primitive | What it does | Status |
@@ -29,7 +23,7 @@ TrustForge is being built around the trust boundaries those actions create.
 | **DataLease** | Sends only the minimum necessary data to approved destinations | Released |
 | **FreshPlan** | Detects aging evidence and re-plans only affected branches | **v0.5.0** |
 | **CommitmentGuard** | Requires evidence before completion claims | MVP |
-| **ReproCapsule** | Packages failures into portable, sanitized reproduction artifacts and verifies replay | **v0.6 in development** |
+| **ReproCapsule** | Packages failures, verifies replay, and exports portable container contexts | **v0.6 in development** |
 
 ## Who this is for
 
@@ -70,7 +64,7 @@ trustforge freshplan check \
   --as-of "2026-09-11T09:30:00Z"
 ```
 
-### Package and verify a failure
+### Package, verify, and export a failure
 
 Build without executing anything:
 
@@ -96,9 +90,17 @@ trustforge reprocapsule replay \
   --fail-on-divergence
 ```
 
-## ReproCapsule v0.6 development
+Export a Docker/devcontainer build context:
 
-ReproCapsule now covers both packaging and replay verification:
+```bash
+trustforge reprocapsule export-container \
+  --capsule .artifacts/reprocapsule \
+  --output .artifacts/reprocapsule-container
+```
+
+The export contains a `Dockerfile`, `.dockerignore`, `.devcontainer/devcontainer.json`, the verified capsule manifest, sanitized trace when present, and verified packaged inputs. Export verifies capsule integrity first and does not build or run Docker automatically.
+
+## ReproCapsule v0.6 development
 
 ```text
 failure context
@@ -120,11 +122,15 @@ explicit --execute gate
 exit-code + failure-signature verification
       ↓
 ready / reproduced / diverged / blocked
+      ↓
+verified Docker/devcontainer export
 ```
 
-Important boundary: the temporary replay workspace is **not a security sandbox**. ReproCapsule reduces accidental environment inheritance and requires explicit execution, but untrusted capsules still need real container/OS isolation.
+The generated container context uses a non-root runtime user and derives a Python major/minor base image from the captured runtime fingerprint. It is a portability aid, not a guarantee that all native/system dependencies are reproduced.
 
-Next on the v0.6 line: Docker/devcontainer export, stronger isolation, and adversarial redaction fixtures.
+Important boundary: neither the temporary replay workspace nor the generated container definition is claimed to be a complete security sandbox. Untrusted capsules still require hardened isolation and an appropriate container/runtime policy.
+
+Next on the v0.6 line: adversarial redaction fixtures, stronger containerized replay isolation, and release hardening.
 
 See [`skills/reprocapsule/SKILL.md`](skills/reprocapsule/SKILL.md) and [`ROADMAP.md`](ROADMAP.md).
 
@@ -157,7 +163,8 @@ For security-sensitive workflows, pin the full release commit SHA instead of the
 - Static capability detection cannot prove runtime behavior.
 - Redaction reduces disclosure but does not automatically make data anonymous.
 - ReproCapsule sanitization is a defensive baseline, not proof that arbitrary secrets can never appear.
-- ReproCapsule replay is not yet a sandbox.
+- ReproCapsule replay and generated container definitions are not complete security sandboxes.
+- Container export does not yet capture arbitrary OS/native dependency locks.
 
 The goal is useful infrastructure with measurable boundaries, not perfect detection or novelty marketing.
 
@@ -165,7 +172,7 @@ The goal is useful infrastructure with measurable boundaries, not perfect detect
 
 TrustForge is still pre-1.0 and is being developed in the open. The repository includes implementation, eval fixtures, known limitations, release checklists, benchmark gates, and design tradeoffs as they evolve.
 
-The active milestone is **ReproCapsule v0.6**. Safe packaging and integrity-gated replay are now implemented; container/devcontainer export is next.
+The active milestone is **ReproCapsule v0.6**. Safe packaging, integrity-gated replay, and Docker/devcontainer export are now implemented.
 
 ## Design principles
 
@@ -192,7 +199,7 @@ The active milestone is **ReproCapsule v0.6**. Safe packaging and integrity-gate
 
 ## Release and compatibility
 
-- Development package version on `main`: **0.6.0.dev1**
+- Development package version on `main`: **0.6.0.dev2**
 - Latest stable release: **v0.5.0**
 - Floating stable GitHub Action ref: **`v0`**
 - License: Apache-2.0
