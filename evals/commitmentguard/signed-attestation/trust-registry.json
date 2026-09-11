@@ -1,0 +1,10 @@
+{
+  "schema_version": "0.1",
+  "keys": [
+    {
+      "issuer": "trustforge-ci",
+      "key_id": "fixture-2026-09",
+      "public_key_file": "fixture-public.pem"
+    }
+  ]
+}
