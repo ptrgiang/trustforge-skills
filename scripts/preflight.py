@@ -1,0 +1,114 @@
+from __future__ import annotations
+
+import json
+import re
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def run(*args: str) -> None:
+    print("\n$", " ".join(args), flush=True)
+    subprocess.run(args, cwd=ROOT, check=True)
+
+
+def check_version() -> None:
+    import trustforge
+
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    version = re.search(r'^version = "([^"]+)"$', pyproject, re.MULTILINE).group(1)
+    if trustforge.__version__ != version:
+        raise RuntimeError(f"version mismatch: pyproject={version}, runtime={trustforge.__version__}")
+    print(f"version consistent: {version}")
+
+
+def main() -> int:
+    python = sys.executable
+    run(python, "-m", "unittest", "discover", "-s", "tests", "-v")
+
+    run(
+        python,
+        "-m",
+        "trustforge.cli",
+        "datalease",
+        "benchmark",
+        "--dataset",
+        "evals/datalease/classifier-benchmark.jsonl",
+        "--min-precision",
+        "0.90",
+        "--min-recall",
+        "0.85",
+    )
+    run(
+        python,
+        "-m",
+        "trustforge.cli",
+        "reprocapsule",
+        "benchmark-redaction",
+        "--dataset",
+        "evals/reprocapsule/redaction-benchmark.jsonl",
+        "--min-secret-recall",
+        "0.90",
+        "--min-clean-specificity",
+        "1.0",
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        capsule = tmp_path / "capsule"
+        exported = tmp_path / "container"
+        report_path = tmp_path / "replay.json"
+
+        run(
+            python,
+            "-m",
+            "trustforge.cli",
+            "reprocapsule",
+            "build",
+            "--spec",
+            "examples/reprocapsule/example-spec.yaml",
+            "--output",
+            str(capsule),
+        )
+        output = subprocess.check_output(
+            [
+                python,
+                "-m",
+                "trustforge.cli",
+                "reprocapsule",
+                "replay",
+                "--capsule",
+                str(capsule),
+                "--execute",
+                "--fail-on-divergence",
+                "--json",
+            ],
+            cwd=ROOT,
+            text=True,
+        )
+        report_path.write_text(output, encoding="utf-8")
+        report = json.loads(output)
+        if report["decision"] != "reproduced":
+            raise RuntimeError(f"ReproCapsule replay did not reproduce: {report['decision']}")
+        run(
+            python,
+            "-m",
+            "trustforge.cli",
+            "reprocapsule",
+            "export-container",
+            "--capsule",
+            str(capsule),
+            "--output",
+            str(exported),
+        )
+
+    check_version()
+    print("\nPreflight passed. Safe to push / mark PR ready for CI.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
