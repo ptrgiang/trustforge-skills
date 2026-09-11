@@ -5,6 +5,12 @@ import json
 import sys
 from pathlib import Path
 
+from .commitment_evidence import (
+    CommitmentEvidenceError,
+    collect_command_exit,
+    collect_json_artifact,
+    dumps as dump_commitment_evidence,
+)
 from .commitment_guard import CommitmentGuardError, render_text as render_commitments, verify_files
 from .datalease import DataLeaseError, apply_files as apply_datalease, dumps as dump_datalease
 from .datalease_eval import (
@@ -44,6 +50,19 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Exit successfully when all required commitments pass/are waived even if optional commitments remain incomplete",
     )
+
+    evidence = sub.add_parser("evidence", help="Collect CommitmentGuard evidence from trusted developer workflows")
+    evidence_sub = evidence.add_subparsers(dest="evidence_command", required=True)
+    evidence_command = evidence_sub.add_parser("command", help="Run an explicit command and emit exit-success evidence")
+    evidence_command.add_argument("--key", required=True, help="Observation key to write")
+    evidence_command.add_argument("--observed-at", default=None, help="Optional deterministic ISO-8601 observation time")
+    evidence_command.add_argument("--timeout", type=float, default=30.0, help="Command timeout in seconds, max 300")
+    evidence_command.add_argument("argv", nargs=argparse.REMAINDER, help="Command argv after --")
+    evidence_json = evidence_sub.add_parser("json-artifact", help="Extract one value from a JSON artifact with hash provenance")
+    evidence_json.add_argument("--key", required=True, help="Observation key to write")
+    evidence_json.add_argument("--input", required=True, dest="input_path", help="JSON artifact path")
+    evidence_json.add_argument("--value-path", required=True, help="Dotted value path; numeric components index arrays")
+    evidence_json.add_argument("--observed-at", default=None, help="Optional deterministic ISO-8601 observation time")
 
     datalease = sub.add_parser("datalease", help="Apply and evaluate purpose-bound data minimization policies")
     datalease_sub = datalease.add_subparsers(dest="datalease_command", required=True)
@@ -136,6 +155,35 @@ def main(argv: list[str] | None = None) -> int:
         if args.accept_partial and report["completion_state"] == "partial" and report["required_satisfied"]:
             return 0
         return 3
+    if args.command == "evidence" and args.evidence_command == "command":
+        argv = list(args.argv)
+        if argv and argv[0] == "--":
+            argv = argv[1:]
+        try:
+            bundle = collect_command_exit(
+                args.key,
+                argv,
+                observed_at=args.observed_at,
+                timeout_seconds=args.timeout,
+            )
+        except CommitmentEvidenceError as exc:
+            print(f"Commitment evidence error: {exc}", file=sys.stderr)
+            return 8
+        print(dump_commitment_evidence(bundle))
+        return 0
+    if args.command == "evidence" and args.evidence_command == "json-artifact":
+        try:
+            bundle = collect_json_artifact(
+                args.key,
+                args.input_path,
+                args.value_path,
+                observed_at=args.observed_at,
+            )
+        except CommitmentEvidenceError as exc:
+            print(f"Commitment evidence error: {exc}", file=sys.stderr)
+            return 8
+        print(dump_commitment_evidence(bundle))
+        return 0
     if args.command == "datalease" and args.datalease_command == "apply":
         try:
             report = apply_datalease(args.policy, args.input_path, args.purpose)
