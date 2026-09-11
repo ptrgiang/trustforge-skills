@@ -14,15 +14,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Root-cause propagation and dependency-safe `replan_order` output.
 - `trustforge freshplan check` CLI with deterministic `--as-of` and `--fail-on-stale` gating.
 - FreshPlan JSON Schema, example plan, unit tests, selective-invalidation eval fixture, and CI smoke gate.
+- Value-free refresh-request generation for stale facts with explicit adapter names and opaque refresh references.
+- Trusted Python `FactRefreshAdapter` / `CallableRefreshAdapter` interface with fail-closed adapter errors.
+- Strict replacement-evidence contract that rejects raw value fields and requires explicit `changed`, `unchanged`, or `unknown` semantics.
+- Minimal FreshPlan control patch with `blocked`, `replan`, and `resume` node operations.
+- Conservative handling where `unknown` replacement changes trigger re-planning instead of resuming old reasoning.
+- `trustforge freshplan requests` and `trustforge freshplan patch` CLI commands.
+- Refresh-request, replacement-evidence, and plan-patch JSON Schemas plus deterministic refresh/patch eval fixtures.
+- Reference refresh adapter demo and CI gates for request generation, replacement patching, adapter execution, and replan exit codes.
 
 ### Changed
 
-- Development package version advanced to `0.5.0.dev0` while stable `v0` remains on `v0.4.0`.
+- Development package version advanced to `0.5.0.dev1` while stable `v0` remains on `v0.4.0`.
 
 ### Planned
 
-- FreshPlan fact refresh adapters and explicit plan patch format.
-- Larger FreshPlan graph benchmarks and richer freshness policies.
+- FreshPlan async refresh adapters and large-graph performance benchmarks.
+- Richer FreshPlan freshness policies and runtime integrations.
 - Larger multilingual/domain-specific DataLease benchmarks.
 - JavaScript/TypeScript structured SkillDiff detectors.
 - Transitive dependency capability analysis.

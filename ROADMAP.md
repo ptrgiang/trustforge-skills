@@ -78,7 +78,7 @@ Purpose- and destination-bound minimum-necessary data projection before tool/API
 
 ## v0.5 — FreshPlan
 
-Freshness-aware dependency graphs for long-running agents.
+Freshness-aware dependency graphs and conservative recovery for long-running agents.
 
 - [x] Metadata-only fact contract with provenance
 - [x] TTL and explicit `valid_until` freshness windows
@@ -91,14 +91,21 @@ Freshness-aware dependency graphs for long-running agents.
 - [x] Cycle, self-dependency, and unknown-reference rejection
 - [x] CLI, JSON output, and `--fail-on-stale` orchestration gate
 - [x] JSON Schema, example, unit tests, eval fixture, and CI smoke gate
+- [x] Value-free refresh-request contract
+- [x] Explicit replacement-evidence contract
+- [x] `changed | unchanged | unknown` replacement semantics
+- [x] Minimal `blocked | replan | resume` plan-patch contract
+- [x] Trusted Python refresh-adapter interface with fail-closed errors
+- [x] CLI `freshplan requests` and `freshplan patch`
+- [x] Refresh/patch schemas, examples, unit tests, eval fixture, and CI gates
 
 ### FreshPlan research backlog
 
-- [ ] Fact refresh adapters
-- [ ] Explicit replacement-evidence / plan-patch format
+- [ ] Async refresh adapter interface
 - [ ] Large-graph performance benchmarks
 - [ ] Richer freshness policies beyond TTL and absolute expiry
-- [ ] Runtime adapters for long-running agent frameworks
+- [ ] Runtime integrations for long-running agent frameworks
+- [ ] Persistent state-store adapter for applying replacement metadata without copying raw values into reports
 
 ## v0.6 — ReproCapsule
 

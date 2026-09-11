@@ -15,7 +15,7 @@ TrustForge Skills is an open-source collection of reliability, verification, pri
 | --- | --- | --- |
 | **SkillDiff** | Detect trust-boundary changes between skill versions | **v0.3 released** |
 | **DataLease** | Purpose- and destination-bound minimum-necessary data sharing | **v0.4.0 released** |
-| **FreshPlan** | Invalidate only plan branches whose source facts have gone stale | **v0.5 MVP** |
+| **FreshPlan** | Refresh stale evidence and re-plan only affected branches | **v0.5 development** |
 | **CommitmentGuard** | Require evidence before an agent can claim completion | MVP |
 | **ReproCapsule** | Package failures into reproducible environments | Planned |
 
@@ -30,12 +30,16 @@ facts + provenance + validity windows
               ↓
          stale detection
               ↓
- selective invalidation
+   value-free refresh request
               ↓
-       minimal re-plan set
+      replacement evidence
+              ↓
+  blocked / replan / resume patch
 ```
 
-FreshPlan stores freshness metadata rather than raw fact values. A stale fact invalidates only the nodes that directly or transitively depend on it; unrelated branches stay valid.
+FreshPlan reports freshness metadata rather than raw fact values. A stale fact invalidates only the nodes that directly or transitively depend on it; unrelated branches stay valid.
+
+### Check freshness
 
 ```bash
 trustforge freshplan check \
@@ -43,16 +47,74 @@ trustforge freshplan check \
   --as-of "2026-09-11T09:30:00Z"
 ```
 
-Use JSON for orchestration:
+### Emit refresh requests
+
+Facts can declare an adapter name and opaque refresh reference:
+
+```yaml
+refresh:
+  adapter: inventory-api
+  reference: inventory:SKU-1
+```
+
+Generate a value-free request report:
 
 ```bash
-trustforge freshplan check \
-  --plan examples/freshplan/order-fulfillment.yaml \
+trustforge freshplan requests \
+  --plan examples/freshplan/refreshable-order.yaml \
   --as-of "2026-09-11T09:30:00Z" \
   --json
 ```
 
-FreshPlan reports stale facts, provenance, invalidated nodes, root stale-fact causes, unaffected nodes, and a dependency-safe `replan_order`.
+The CLI does not dynamically import or execute adapters. Application code registers trusted adapter objects explicitly.
+
+### Apply replacement evidence and emit a minimal patch
+
+```bash
+trustforge freshplan patch \
+  --plan examples/freshplan/refreshable-order.yaml \
+  --evidence examples/freshplan/replacement-evidence.json \
+  --as-of "2026-09-11T09:30:00Z" \
+  --json
+```
+
+Each replacement must explicitly declare:
+
+```text
+change = changed | unchanged | unknown
+```
+
+`changed` and `unknown` conservatively re-plan the affected branch. `unchanged` can resume the existing branch after freshness is restored. If replacement evidence is still stale, the branch remains blocked.
+
+The control-plane patch uses only three node operations:
+
+```text
+blocked  → evidence is still stale; do not continue
+replan   → replacement changed or change is unknown
+resume   → freshness restored and replacement is explicitly unchanged
+```
+
+### Python adapter API
+
+```python
+from trustforge.freshplan_refresh import CallableRefreshAdapter, refresh_with_adapters
+
+adapter = CallableRefreshAdapter("inventory-api", refresh_inventory)
+patch = refresh_with_adapters(
+    plan,
+    {"inventory-api": adapter},
+    as_of="2026-09-11T09:30:00Z",
+)
+```
+
+Adapter requests contain freshness/provenance metadata and refresh references, not raw fact values. Adapter failures, missing registrations, malformed evidence, or evidence for the wrong fact fail closed.
+
+Contracts:
+
+- [`contracts/freshplan.schema.json`](contracts/freshplan.schema.json)
+- [`contracts/freshplan-refresh-request.schema.json`](contracts/freshplan-refresh-request.schema.json)
+- [`contracts/freshplan-replacement.schema.json`](contracts/freshplan-replacement.schema.json)
+- [`contracts/freshplan-patch.schema.json`](contracts/freshplan-patch.schema.json)
 
 ## DataLease v0.4
 
@@ -196,13 +258,14 @@ SkillDiff → DataLease → FreshPlan → CommitmentGuard → ReproCapsule
 4. **Destination binding** — minimum data still must not be sent to an unauthorized host/tool.
 5. **Measurable classifier quality** — publish regression metrics and known mismatches instead of claiming perfect detection.
 6. **Freshness is explicit** — facts used in plans should have provenance and validity windows.
-7. **Failures should travel** — a bug report is more useful when another machine can reproduce it.
-8. **Agent-agnostic by default** — trust primitives should work across coding agents, MCP runtimes, and custom orchestration.
-9. **No unverifiable novelty claims** — TrustForge documents prior art and focuses on measurable capability gaps.
+7. **Conservative recovery** — unknown replacement changes should trigger re-planning rather than silently resuming stale reasoning.
+8. **Failures should travel** — a bug report is more useful when another machine can reproduce it.
+9. **Agent-agnostic by default** — trust primitives should work across coding agents, MCP runtimes, and custom orchestration.
+10. **No unverifiable novelty claims** — TrustForge documents prior art and focuses on measurable capability gaps.
 
 ## Release and compatibility
 
-- Current development package version: **0.5.0.dev0**.
+- Current development package version: **0.5.0.dev1**.
 - Latest stable release: **v0.4.0**.
 - Floating stable GitHub Action ref: **`v0`**, still pinned to the v0.4.0 release line while FreshPlan develops on `main`.
 - Stable release notes: [`docs/releases/v0.4.0.md`](docs/releases/v0.4.0.md).
