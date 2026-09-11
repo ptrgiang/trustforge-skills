@@ -15,33 +15,41 @@ from trustforge.commitment_evidence import (
 
 
 class CommitmentEvidenceTests(unittest.TestCase):
-    def test_command_adapter_records_exit_only_without_output(self):
+    def test_command_adapter_records_exit_only_without_raw_command_data(self):
         calls = []
 
         def runner(argv, **kwargs):
             calls.append((argv, kwargs))
-            return subprocess.CompletedProcess(argv, 0, stdout="secret output", stderr="secret error")
+            return subprocess.CompletedProcess(argv, 0)
 
         bundle = collect_command_exit(
             "tests.passed",
-            ["python", "-m", "unittest"],
+            ["python", "--api-key=super-secret", "-m", "unittest"],
             observed_at="2026-09-11T14:30:00Z",
             runner=runner,
         )
 
         observation = bundle["observations"]["tests.passed"]
+        source = observation["source"]
+        serialized = json.dumps(bundle)
         self.assertTrue(observation["value"])
-        self.assertEqual(observation["source"]["kind"], "command")
-        self.assertEqual(observation["source"]["exit_code"], 0)
-        self.assertFalse(observation["source"]["stdout_captured"])
-        self.assertFalse(observation["source"]["stderr_captured"])
-        self.assertNotIn("secret output", json.dumps(bundle))
-        self.assertNotIn("secret error", json.dumps(bundle))
+        self.assertEqual(source["kind"], "command")
+        self.assertEqual(source["exit_code"], 0)
+        self.assertEqual(source["executable"], "python")
+        self.assertEqual(source["argument_count"], 3)
+        self.assertEqual(len(source["argv_sha256"]), 64)
+        self.assertFalse(source["stdout_captured"])
+        self.assertFalse(source["stderr_captured"])
+        self.assertNotIn("super-secret", serialized)
+        self.assertNotIn("--api-key", serialized)
+        self.assertNotIn("argv\"", serialized)
         self.assertFalse(calls[0][1]["shell"])
+        self.assertEqual(calls[0][1]["stdout"], subprocess.DEVNULL)
+        self.assertEqual(calls[0][1]["stderr"], subprocess.DEVNULL)
 
     def test_command_adapter_false_on_nonzero_exit(self):
         def runner(argv, **kwargs):
-            return subprocess.CompletedProcess(argv, 2, stdout="", stderr="")
+            return subprocess.CompletedProcess(argv, 2)
 
         bundle = collect_command_exit("tests.passed", ["false"], runner=runner)
         self.assertFalse(bundle["observations"]["tests.passed"]["value"])
