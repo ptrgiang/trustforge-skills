@@ -190,13 +190,19 @@ Evidence-backed completion contracts for autonomous agents.
 - [x] Package-manifest exact-snapshot evidence adapter with SHA-256 provenance
 - [x] OpenAPI path+method removal evidence adapter with hash/count-only provenance
 - [x] Package-manifest / API-diff CLI and shared-preflight gates
-- [ ] Signed evidence attestations
-- [ ] Release hardening for `v0.7.0`
+- [x] Prepare v0.7.0 release notes and checklist
+- [x] Finalize package/runtime version to `0.7.0`
+- [x] Freeze compatibility and trust-boundary documentation
+- [x] Release hardening for `v0.7.0`
+- [ ] Run final CI/release-candidate matrix
+- [ ] Release `v0.7.0` and advance stable `v0`
 
 ### CommitmentGuard research backlog
 
+- [ ] Signed evidence attestations
 - [ ] Natural-language commitment extraction
 - [ ] Browser-task evidence adapters
+- [ ] Richer API compatibility analysis
 - [ ] Temporal commitments and deadlines beyond evidence freshness
 - [ ] Hierarchical commitments for multi-agent workflows
 - [ ] Completion-language policy integration
