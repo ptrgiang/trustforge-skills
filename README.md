@@ -1,7 +1,7 @@
 # TrustForge Skills
 
 [![CI](https://github.com/ptrgiang/trustforge-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/ptrgiang/trustforge-skills/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/badge/release-v0.6.0-7c3aed)](https://github.com/ptrgiang/trustforge-skills/releases/tag/v0.6.0)
+[![Release](https://img.shields.io/badge/release-v0.7.0-7c3aed)](https://github.com/ptrgiang/trustforge-skills/releases/tag/v0.7.0)
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)](pyproject.toml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
@@ -20,7 +20,7 @@ TrustForge does not try to be another agent framework. It sits around agent work
 | **SkillDiff** | Detects trust-boundary changes between skill versions | Released |
 | **DataLease** | Sends only the minimum necessary data to approved destinations | Released |
 | **FreshPlan** | Detects aging evidence and re-plans only affected branches | **v0.5.0** |
-| **CommitmentGuard** | Requires evidence before completion claims | **v0.7.0 release candidate** |
+| **CommitmentGuard** | Requires evidence before completion claims | **v0.7.0** |
 | **ReproCapsule** | Packages failures, verifies replay, exports/replays container contexts, and gates trace redaction | **v0.6.0** |
 
 ## Who this is for
@@ -242,7 +242,7 @@ The goal is useful infrastructure with measurable boundaries, not perfect detect
 
 TrustForge is still pre-1.0 and is being developed in the open. The repository includes implementation, eval fixtures, known limitations, release checklists, benchmark gates, and design tradeoffs as they evolve.
 
-The latest published stable release remains **v0.6.0** until the v0.7.0 release is tagged, published, and verified. This branch is the **v0.7.0 release candidate**.
+The latest stable release is **v0.7.0**. Future development continues on `main`; the floating stable `v0` ref now points to the verified v0.7.0 release commit.
 
 ## Design principles
 
@@ -269,9 +269,9 @@ The latest published stable release remains **v0.6.0** until the v0.7.0 release 
 
 ## Release and compatibility
 
-- Release-candidate package/runtime version: **0.7.0**
-- Latest published stable release: **v0.6.0**
-- Floating stable GitHub Action ref: **`v0`**, pinned to the v0.6.0 release commit until v0.7.0 is published and verified
+- Package/runtime version: **0.7.0**
+- Latest stable release: **v0.7.0**
+- Floating stable GitHub Action ref: **`v0`**, pinned to the verified v0.7.0 release commit
 - License: Apache-2.0
 
 ## Contributing
