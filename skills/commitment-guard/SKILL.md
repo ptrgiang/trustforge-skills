@@ -11,55 +11,79 @@ metadata:
 
 # CommitmentGuard
 
-Use CommitmentGuard for tasks where the user gave constraints that must remain true at completion: compatibility, coverage, API stability, dependency limits, output format, security requirements, or other acceptance criteria.
+Status: v0.7 development
+
+CommitmentGuard verifies whether an agent has enough evidence to make a completion claim.
 
 ## Core rule
 
 **A confident completion statement is not evidence.**
 
-An agent must classify every commitment as one of:
+Every commitment resolves to one of:
 
-- `PASS` — supporting evidence exists and satisfies the rule;
+- `PASS` — evidence exists and satisfies the rule;
 - `FAIL` — evidence contradicts the rule;
 - `UNKNOWN` — required evidence is missing or cannot be evaluated;
-- `WAIVED` — the user explicitly released this commitment.
+- `WAIVED` — an explicit waiver is recorded in the contract.
 
-`FAIL` and `UNKNOWN` block `VERIFIED COMPLETE`.
+v0.7 also distinguishes required and optional commitments so the overall result can be:
 
-## Inputs
+- `verified_complete` — every commitment is `PASS` or `WAIVED`;
+- `partial` — all required commitments are satisfied, but one or more optional commitments are `FAIL` or `UNKNOWN`;
+- `not_verified` — at least one required commitment is `FAIL` or `UNKNOWN`.
 
-### Contract
-
-JSON document containing explicit commitments:
+## Contract v0.2
 
 ```json
 {
+  "schema_version": "0.2",
   "commitments": [
     {
-      "id": "C1",
-      "description": "Coverage remains at least 90%",
+      "id": "tests-pass",
+      "description": "The test suite passes",
+      "evidence": {
+        "key": "tests.passed",
+        "truthy": true
+      }
+    },
+    {
+      "id": "coverage-target",
+      "description": "Coverage is at least 95%",
+      "required": false,
       "evidence": {
         "key": "tests.coverage",
-        "gte": 90
+        "gte": 95
       }
     }
   ]
 }
 ```
 
-### Evidence
+`required` defaults to `true` for backward compatibility.
 
-JSON document created from tests, diffs, CI, or other tools:
+## Evidence bundle v0.2
+
+Evidence can carry provenance instead of being only a nested value map:
 
 ```json
 {
-  "tests": {
-    "coverage": 92.4
+  "schema_version": "0.2",
+  "observations": {
+    "tests.passed": {
+      "value": true,
+      "observed_at": "2026-09-11T14:00:00Z",
+      "source": {
+        "kind": "command",
+        "ref": "python -m unittest discover -s tests -v"
+      }
+    }
   }
 }
 ```
 
-## Supported MVP checks
+The verifier preserves this provenance in the commitment result. Legacy nested evidence remains supported.
+
+## Supported checks
 
 - `equals`
 - `gte`
@@ -67,20 +91,31 @@ JSON document created from tests, diffs, CI, or other tools:
 - `truthy`
 - `contains`
 
-Evidence keys use dot notation, for example `tests.coverage`.
+A rule must contain exactly one supported operator. Evidence keys use dot notation in legacy bundles and direct observation IDs in v0.2 bundles.
 
-## Procedure
+## Structured waivers
 
-1. Extract user commitments before or during task execution.
-2. Give every commitment a stable ID.
-3. Define what evidence would prove or disprove it.
-4. Perform the work.
-5. Gather evidence from tools rather than agent self-assessment where possible.
-6. Verify every commitment.
-7. Do not claim verified completion while any item is `FAIL` or `UNKNOWN`.
-8. Record waivers only when they represent an explicit user decision.
+v0.7 supports explicit waiver metadata:
+
+```json
+{
+  "id": "coverage-target",
+  "description": "Coverage is at least 95%",
+  "waiver": {
+    "reason": "Accepted for emergency hotfix",
+    "approved_by": "release-owner",
+    "ticket": "INC-42"
+  }
+}
+```
+
+Supported waiver metadata is `reason`, `approved_by`, `ticket`, and `expires_at`. A reason is mandatory. Legacy string waivers remain accepted for compatibility.
+
+An agent must not invent a waiver to make a completion claim pass.
 
 ## CLI
+
+Strict completion gate:
 
 ```bash
 trustforge verify ./contract.json --evidence ./evidence.json
@@ -92,57 +127,68 @@ Machine-readable output:
 trustforge verify ./contract.json --evidence ./evidence.json --json
 ```
 
-Exit codes:
+Allow a `partial` result to exit successfully when all required commitments are satisfied:
 
-- `0`: verified complete;
-- `3`: one or more commitments failed or remain unknown.
-
-## Example
-
-User request:
-
-> Refactor this module. Do not change the public API, do not add dependencies, keep Python 3.10 support, and maintain at least 90% coverage.
-
-Expected final verification:
-
-```text
-C1 PASS: Public API unchanged
-C2 PASS: No new dependencies
-C3 PASS: Python 3.10 supported
-C4 UNKNOWN: Coverage remains at least 90%
-
-Result: NOT VERIFIED
+```bash
+trustforge verify ./contract.json \
+  --evidence ./evidence.json \
+  --accept-partial
 ```
 
-The agent should then gather the missing coverage result instead of saying the task is finished.
+Exit codes:
 
-## Waivers
+- `0`: verified complete, or `partial` when `--accept-partial` is explicitly supplied;
+- `3`: invalid contract/evidence, required blocker, or strict completion gate not satisfied.
 
-A commitment may be waived only when the contract records an explicit reason, for example:
+## Procedure
+
+1. Extract explicit user commitments before or during execution.
+2. Give each commitment a stable ID.
+3. Mark acceptance-critical commitments as required.
+4. Define machine-checkable evidence for each commitment.
+5. Gather evidence from tools rather than agent self-assessment where possible.
+6. Attach provenance to observations when available.
+7. Verify the contract.
+8. Do not claim full completion for `partial` or `not_verified`.
+9. Record waivers only when they reflect an explicit authorized decision.
+
+## Compatibility
+
+CommitmentGuard v0.7 keeps the original contract/evidence examples valid:
 
 ```json
 {
-  "id": "C4",
-  "description": "Coverage remains at least 90%",
-  "waiver": "User explicitly accepted 88% coverage for this patch."
+  "commitments": [
+    {
+      "id": "C1",
+      "description": "Coverage remains at least 90%",
+      "evidence": {"key": "tests.coverage", "gte": 90}
+    }
+  ]
 }
 ```
 
-An agent must not silently create a waiver to make a task pass.
+with evidence:
 
-## Failure modes
+```json
+{"tests": {"coverage": 92.4}}
+```
+
+## Boundaries
 
 CommitmentGuard cannot guarantee correctness when:
 
-- the contract omitted a user requirement;
-- evidence is fabricated or generated by an untrusted source;
+- the contract omitted an important user requirement;
+- evidence is fabricated or comes from an untrusted source;
+- provenance identifies a source but does not cryptographically prove it;
 - the evidence key measures a proxy rather than the actual requirement;
-- a natural-language requirement has not yet been compiled into a reliable check.
+- an optional commitment was incorrectly classified as non-blocking;
+- a natural-language requirement has not been compiled into a reliable check.
 
-## Future work
+## v0.7 research backlog
 
+- evidence signatures / attestations;
 - natural-language commitment extraction;
-- provenance and signatures for evidence;
 - direct adapters for pytest, GitHub Actions, package manifests, API diffs, and browser tasks;
 - temporal commitments and deadlines;
 - hierarchical commitments for multi-agent workflows;
