@@ -6,7 +6,7 @@ import sys
 
 from .commitment_guard import render_text as render_commitments
 from .commitment_guard import verify_files
-from .skilldiff import compare, dumps as dump_skilldiff, dumps_sarif, render_text as render_skilldiff
+from .skilldiff_v03 import compare, dumps as dump_skilldiff, dumps_sarif, render_text as render_skilldiff
 
 
 def build_parser() -> argparse.ArgumentParser:
