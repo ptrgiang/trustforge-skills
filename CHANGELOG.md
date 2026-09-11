@@ -6,9 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- ReproCapsule v0.6 build spec and schema.
+- `trustforge reprocapsule build` CLI.
+- Portable reproduction manifest with OS/Python environment fingerprint.
+- Explicit failing-input packaging with SHA-256 integrity metadata.
+- Sanitized trace packaging with common secret redaction.
+- Environment-variable presence capture without raw values.
+- Fail-closed checks for secret-like command arguments, path traversal, and sensitive credential/config inputs.
+- ReproCapsule example fixture, tests, skill spec, and CI smoke gate.
+
+### Changed
+
+- Development version advanced to `0.6.0.dev0`.
+
 ### Planned
 
-- ReproCapsule v0.6 portable failure-reproduction primitives.
+- ReproCapsule replay verification and integrity checks.
+- Docker/devcontainer export.
+- Adversarial trace-redaction fixtures.
 - FreshPlan async refresh adapters, runtime integrations, and persistent metadata state-store adapters.
 - Larger/more varied FreshPlan graph-shape benchmarks and domain-specific freshness-policy linting.
 - Larger multilingual/domain-specific DataLease benchmarks.
