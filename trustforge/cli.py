@@ -41,6 +41,12 @@ from .reprocapsule import (
     replay_capsule,
     render_text as render_reprocapsule,
 )
+from .reprocapsule_eval import (
+    ReproCapsuleBenchmarkError,
+    benchmark_file as benchmark_reprocapsule,
+    dumps as dump_reprocapsule_benchmark,
+    render_text as render_reprocapsule_benchmark,
+)
 from .reprocapsule_export import export_container, render_export_text
 from .skilldiff_v03 import compare, dumps as dump_skilldiff, dumps_sarif, render_text as render_skilldiff
 
@@ -142,6 +148,15 @@ def build_parser() -> argparse.ArgumentParser:
     reprocapsule_export.add_argument("--capsule", required=True, help="Path to a built capsule directory")
     reprocapsule_export.add_argument("--output", required=True, help="Directory for the generated container context")
     reprocapsule_export.add_argument("--json", action="store_true", dest="as_json")
+
+    reprocapsule_benchmark = reprocapsule_sub.add_parser(
+        "benchmark-redaction",
+        help="Evaluate trace redaction against an adversarial JSONL fixture",
+    )
+    reprocapsule_benchmark.add_argument("--dataset", required=True, help="Path to ReproCapsule redaction JSONL dataset")
+    reprocapsule_benchmark.add_argument("--json", action="store_true", dest="as_json")
+    reprocapsule_benchmark.add_argument("--min-secret-recall", type=float, default=None)
+    reprocapsule_benchmark.add_argument("--min-clean-specificity", type=float, default=None)
 
     return parser
 
@@ -279,6 +294,27 @@ def main(argv: list[str] | None = None) -> int:
             return 7
         print(dump_reprocapsule(report) if args.as_json else render_export_text(report))
         return 0 if report["decision"] == "exported" else 7
+
+    if args.command == "reprocapsule" and args.reprocapsule_command == "benchmark-redaction":
+        for name in ("min_secret_recall", "min_clean_specificity"):
+            threshold = getattr(args, name)
+            if threshold is not None and not 0.0 <= threshold <= 1.0:
+                print(
+                    f"ReproCapsule benchmark error: --{name.replace('_', '-')} must be between 0 and 1",
+                    file=sys.stderr,
+                )
+                return 7
+        try:
+            report = benchmark_reprocapsule(args.dataset)
+        except (ReproCapsuleBenchmarkError, OSError) as exc:
+            print(f"ReproCapsule benchmark error: {exc}", file=sys.stderr)
+            return 7
+        print(dump_reprocapsule_benchmark(report) if args.as_json else render_reprocapsule_benchmark(report))
+        if args.min_secret_recall is not None and report["secret_recall"] < args.min_secret_recall:
+            return 7
+        if args.min_clean_specificity is not None and report["clean_specificity"] < args.min_clean_specificity:
+            return 7
+        return 0
 
     return 1
 
