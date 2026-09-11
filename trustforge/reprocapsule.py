@@ -30,7 +30,7 @@ QUOTED_JSON_SECRET_RE = re.compile(
     rf"\s*:\s*(?P<value_quote>[\"'])(?P<value>[^\"']+)(?P=value_quote)"
 )
 BEARER_RE = re.compile(
-    r"(?i)\bBearer\s+(?P<token>(?=[A-Za-z0-9._~+/=-]{12,}\b)"
+    r"(?i)\bBearer\s+(?P<token>(?=[A-Za-z0-9._~+/=-]{8,}\b)"
     r"(?=[A-Za-z0-9._~+/=-]*[0-9._~+/=-])[A-Za-z0-9._~+/=-]+)"
 )
 AWS_KEY_RE = re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b")
