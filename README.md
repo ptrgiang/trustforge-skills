@@ -9,16 +9,14 @@
 
 TrustForge Skills is an open-source collection of reliability, verification, privacy, and safety primitives for autonomous AI agents.
 
-The project starts from a simple observation: as agent ecosystems grow, the hard problem is no longer only *what can an agent do?* It is also:
+The project focuses on trust questions that become important once agents can install skills, call tools, send data, and claim work is complete:
 
 - Did a skill silently gain new capabilities?
-- Did its trigger scope quietly become much broader?
+- Did its trigger scope become broader?
+- Did the agent expose more data than the task required?
+- Was that data sent to an authorized destination?
 - Did the agent satisfy every user constraint before claiming completion?
-- Did it expose more data than the task required?
-- Is the plan still valid after external facts changed?
 - Can a failure be reproduced by another developer?
-
-TrustForge turns those questions into reusable skills, contracts, evidence, and evals.
 
 ## Current focus
 
@@ -67,11 +65,11 @@ Use the released GitHub Action:
     report-path: artifacts/skilldiff.sarif
 ```
 
-`v0` is the floating stable pre-1.0 action line. For security-sensitive workflows, pin an exact commit SHA. A complete workflow is available at [`examples/github-actions/skilldiff.yml`](examples/github-actions/skilldiff.yml).
+`v0` is the floating stable pre-1.0 action line. Security-sensitive workflows should pin an exact commit SHA.
 
 ## DataLease — share only what the task needs
 
-DataLease can now sit directly in front of an HTTP transport or MCP tool dispatcher:
+DataLease can sit directly in front of an HTTP transport or MCP tool dispatcher:
 
 ```text
 Agent payload / tool arguments
@@ -80,14 +78,16 @@ Declared purpose
         ↓
 Destination binding
         ↓
-DataLease projection
+Field classifiers
         ↓
 allow / redact / deny
+        ↓
+Minimum-necessary payload
         ↓
 HTTP transport / MCP tool
 ```
 
-A transfer therefore needs both an authorized **purpose** and an authorized **destination**. HTTP adapters bind scheme/host/method; MCP adapters bind tool names or wildcard patterns. The transport is not called when either check fails.
+A transfer therefore needs an authorized **purpose**, authorized **destination**, and field-level policy decision.
 
 Example interception policy:
 
@@ -122,7 +122,7 @@ rules:
     strategy: email_domain
 ```
 
-Core CLI projection:
+Core projection:
 
 ```bash
 trustforge datalease apply \
@@ -132,7 +132,7 @@ trustforge datalease apply \
   --payload-only
 ```
 
-Reference HTTP adapter:
+Reference HTTP interception:
 
 ```python
 from trustforge.datalease_adapters import HTTPDataLeaseAdapter
@@ -146,7 +146,7 @@ result = adapter.send_json(
 )
 ```
 
-Reference MCP adapter:
+Reference MCP interception:
 
 ```python
 from trustforge.datalease_adapters import MCPDataLeaseAdapter
@@ -159,13 +159,68 @@ result = adapter.call_tool(
 )
 ```
 
-Sync and async variants are included. A runnable, network-free demonstration is available at [`examples/datalease/interceptor_demo.py`](examples/datalease/interceptor_demo.py).
+Sync and async variants are included. A runnable network-free demo lives at [`examples/datalease/interceptor_demo.py`](examples/datalease/interceptor_demo.py).
 
-The HTTP reference adapter currently projects the JSON body. Transport-owned headers such as authentication are passed through and are outside the application-payload policy surface; callers should not place user data in ungoverned headers. DataLease remains a data-minimization policy engine, not a compliance certification or guarantee about downstream retention/use.
+## Pluggable DataLease classifiers
+
+Applications can supply trusted Python classifier objects without changing the serialized policy format or dynamically importing untrusted plugin strings.
+
+```python
+from trustforge.datalease import apply_policy
+from trustforge.datalease_classifiers import ClassificationFinding
+
+class EmployeeIdClassifier:
+    name = "employee-id-v1"
+
+    def classify(self, path, value):
+        if path.endswith("employee_id"):
+            return [ClassificationFinding(
+                label="sensitivity.internal_id",
+                detector=self.name,
+                confidence=0.98,
+                reason="Organization-specific employee identifier.",
+            )]
+        return []
+
+report = apply_policy(
+    policy,
+    purpose,
+    payload,
+    classifiers=[EmployeeIdClassifier()],
+)
+```
+
+Custom findings can participate in normal classifier rules or `hard_deny_classifiers`. HTTP/MCP adapters accept the same `classifiers=[...]` argument. Classifier failures fail closed with `DataLeaseError`.
+
+Audit records expose classifier provenance such as label, detector, confidence, and reason, but never copy the original leaf value into classifier evidence.
+
+A complete example is available at [`examples/datalease/custom_classifier.py`](examples/datalease/custom_classifier.py).
+
+## Classifier benchmark
+
+TrustForge includes a small deterministic regression dataset with positive, negative, and adversarial classifier cases:
+
+```bash
+trustforge datalease benchmark \
+  --dataset evals/datalease/classifier-benchmark.jsonl
+```
+
+Current built-in baseline on the 30-case synthetic fixture:
+
+```text
+precision:   0.913
+recall:      0.875
+F1:          0.894
+exact match: 25 / 30
+```
+
+CI enforces minimum micro precision `0.90` and recall `0.85` so detector changes cannot silently regress below the documented baseline.
+
+The fixture intentionally contains known mismatches, including metadata fields such as `email_verified`/`email_domain` and sensitive values embedded in free text. It is a regression suite, **not** evidence of production-grade PII detection or compliance certification. See [`evals/datalease/README.md`](evals/datalease/README.md).
 
 ## Local quick start
 
-Development head currently targets `0.4.0.dev1`:
+Development head currently targets `0.4.0.dev2`:
 
 ```bash
 git clone https://github.com/ptrgiang/trustforge-skills.git
@@ -189,15 +244,13 @@ trustforge verify examples/refactor-contract.json \
   --evidence examples/refactor-evidence.json
 ```
 
-DataLease:
+DataLease benchmark gate:
 
 ```bash
-trustforge datalease apply \
-  --policy examples/datalease/support-policy.json \
-  --purpose "send order summary to support tool" \
-  --input examples/datalease/order-payload.json \
-  --payload-only \
-  --audit-output .artifacts/datalease-audit.json
+trustforge datalease benchmark \
+  --dataset evals/datalease/classifier-benchmark.jsonl \
+  --min-precision 0.90 \
+  --min-recall 0.85
 ```
 
 ## Core idea
@@ -222,10 +275,11 @@ Can we reproduce the failure?
 2. **Least capability** — new filesystem, network, subprocess, secret, or environment access should be visible.
 3. **Least data** — tools should receive only fields necessary for the declared purpose.
 4. **Destination binding** — minimum data still must not be sent to an unauthorized host/tool.
-5. **Freshness is explicit** — facts used in plans should have provenance and validity windows.
-6. **Failures should travel** — a bug report is more useful when another machine can reproduce it.
-7. **Agent-agnostic by default** — trust primitives should work across coding agents, MCP runtimes, and custom orchestration.
-8. **No unverifiable novelty claims** — TrustForge documents prior art and focuses on measurable capability gaps.
+5. **Measured limitations** — heuristics should have regression datasets and published failure cases.
+6. **Freshness is explicit** — facts used in plans should have provenance and validity windows.
+7. **Failures should travel** — a bug report is more useful when another machine can reproduce it.
+8. **Agent-agnostic by default** — trust primitives should work across coding agents, MCP runtimes, and custom orchestration.
+9. **No unverifiable novelty claims** — TrustForge documents prior art and focuses on measurable capability gaps.
 
 ## Repository layout
 
@@ -238,7 +292,9 @@ trustforge-skills/
 │   └── datalease/
 ├── trustforge/
 │   ├── datalease.py
-│   └── datalease_adapters.py
+│   ├── datalease_adapters.py
+│   ├── datalease_classifiers.py
+│   └── datalease_eval.py
 ├── contracts/
 ├── examples/
 ├── evals/
@@ -250,7 +306,7 @@ trustforge-skills/
 
 - Latest stable release: **v0.3.0**.
 - Floating stable GitHub Action ref: **`v0`**.
-- `main` currently contains DataLease v0.4 development work and is not the stable action line.
+- `main` contains DataLease v0.4 development work and is not the stable action line.
 - Security-sensitive consumers should pin an exact commit SHA.
 - Changes are documented in [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -260,7 +316,7 @@ See [`ROADMAP.md`](ROADMAP.md).
 
 ## Contributing
 
-Contributions are especially welcome for adversarial evals, privacy-policy fixtures, classifier plugins, new language detectors, agent-runtime integrations, and prior-art references. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Contributions are especially welcome for adversarial evals, multilingual privacy fixtures, classifier plugins, new language detectors, agent-runtime integrations, and prior-art references. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Security
 
