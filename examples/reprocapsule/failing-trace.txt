@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "parser_demo.py", line 5, in <module>
+    assert "required" in payload, "missing required field"
+AssertionError: missing required field
+API_KEY=example-secret-value
+Authorization: Bearer example-example-example-token
