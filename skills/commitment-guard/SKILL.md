@@ -75,8 +75,8 @@ Evidence can carry provenance instead of being only a nested value map:
       "value": true,
       "observed_at": "2026-09-11T14:00:00Z",
       "source": {
-        "kind": "command",
-        "ref": "python -m unittest discover -s tests -v"
+        "kind": "ci",
+        "ref": "run-123"
       }
     }
   }
@@ -92,18 +92,45 @@ A commitment can constrain the evidence used to prove it:
 - `max_age_seconds` requires `observed_at` and rejects stale or future-dated observations;
 - `allowed_source_kinds` requires `source.kind` and rejects sources outside the allow-list.
 
-Example:
+If evidence violates either policy, CommitmentGuard returns `UNKNOWN` rather than evaluating the value as proof.
 
-```json
-{
-  "key": "security.scan_passed",
-  "truthy": true,
-  "max_age_seconds": 600,
-  "allowed_source_kinds": ["ci", "scanner"]
-}
+## Evidence collection adapters
+
+v0.7 can produce evidence bundles directly from developer workflows.
+
+### Command exit evidence
+
+```bash
+trustforge evidence command \
+  --key tests.passed \
+  --observed-at "2026-09-11T14:30:00Z" \
+  -- python -m unittest discover -s tests
 ```
 
-If evidence violates either policy, CommitmentGuard returns `UNKNOWN` rather than evaluating the value as proof.
+The observation value is `true` for exit code `0` and `false` otherwise. The adapter uses `shell=False`, discards stdout/stderr, and does not store raw command arguments. Provenance contains only:
+
+- `kind: command`;
+- executable;
+- argument count;
+- SHA-256 fingerprint of the argv sequence;
+- exit code;
+- explicit flags showing stdout/stderr were not captured.
+
+This reduces the chance that credentials passed on a command line are copied into an evidence bundle. It does not make putting secrets on a command line safe.
+
+### JSON artifact evidence
+
+```bash
+trustforge evidence json-artifact \
+  --key tests.coverage \
+  --input coverage.json \
+  --value-path totals.percent \
+  --observed-at "2026-09-11T14:30:00Z"
+```
+
+The adapter extracts one value using a dotted path and records artifact provenance including path, selected value path, SHA-256, and size. Numeric path components can index arrays.
+
+Application code can also use `merge_bundles()` to combine distinct v0.2 observations. Duplicate keys fail closed.
 
 ## Supported checks
 
@@ -136,7 +163,7 @@ Supported waiver metadata is `reason`, `approved_by`, `ticket`, and `expires_at`
 
 An agent must not invent a waiver to make a completion claim pass.
 
-## CLI
+## Verification CLI
 
 Strict completion gate:
 
@@ -152,12 +179,6 @@ trustforge verify ./contract.json \
   --as-of "2026-09-11T14:01:00Z"
 ```
 
-Machine-readable output:
-
-```bash
-trustforge verify ./contract.json --evidence ./evidence.json --json
-```
-
 Allow a `partial` result to exit successfully when all required commitments are satisfied:
 
 ```bash
@@ -168,8 +189,9 @@ trustforge verify ./contract.json \
 
 Exit codes:
 
-- `0`: verified complete, or `partial` when `--accept-partial` is explicitly supplied;
-- `3`: invalid contract/evidence, required blocker, or strict completion gate not satisfied.
+- `0`: successful evidence collection, verified complete, or accepted partial completion;
+- `3`: CommitmentGuard verification did not satisfy the selected completion policy;
+- `8`: evidence collection failed.
 
 ## Procedure
 
@@ -177,34 +199,16 @@ Exit codes:
 2. Give each commitment a stable ID.
 3. Mark acceptance-critical commitments as required.
 4. Define machine-checkable evidence for each commitment.
-5. Define freshness/source policy when the evidence can age or comes from multiple trust domains.
-6. Gather evidence from tools rather than agent self-assessment where possible.
-7. Attach provenance to observations when available.
+5. Define freshness/source policy when evidence can age or comes from multiple trust domains.
+6. Collect evidence from explicit tools/adapters rather than agent self-assessment where possible.
+7. Preserve provenance without unnecessarily copying sensitive command output or arguments.
 8. Verify the contract at an explicit evaluation time for deterministic workflows.
 9. Do not claim full completion for `partial` or `not_verified`.
 10. Record waivers only when they reflect an explicit authorized decision.
 
 ## Compatibility
 
-CommitmentGuard v0.7 keeps the original contract/evidence examples valid:
-
-```json
-{
-  "commitments": [
-    {
-      "id": "C1",
-      "description": "Coverage remains at least 90%",
-      "evidence": {"key": "tests.coverage", "gte": 90}
-    }
-  ]
-}
-```
-
-with evidence:
-
-```json
-{"tests": {"coverage": 92.4}}
-```
+CommitmentGuard v0.7 keeps the original nested evidence format valid. The new collection adapters emit schema v0.2 bundles and do not change the legacy verification path.
 
 ## Boundaries
 
@@ -214,7 +218,8 @@ CommitmentGuard cannot guarantee correctness when:
 - evidence is fabricated or comes from an untrusted source that is incorrectly allow-listed;
 - provenance identifies a source but does not cryptographically prove it;
 - timestamps are trustworthy in format but not in origin;
-- the evidence key measures a proxy rather than the actual requirement;
+- an artifact is trustworthy by hash but its producer was compromised;
+- command exit code is only a proxy for the actual requirement;
 - an optional commitment was incorrectly classified as non-blocking;
 - a natural-language requirement has not been compiled into a reliable check.
 
@@ -222,7 +227,8 @@ CommitmentGuard cannot guarantee correctness when:
 
 - evidence signatures / attestations;
 - natural-language commitment extraction;
-- direct adapters for pytest, GitHub Actions, package manifests, API diffs, and browser tasks;
+- dedicated pytest and GitHub Actions adapters;
+- package manifest, API diff, and browser-task adapters;
 - temporal commitments and deadlines beyond observation freshness;
 - hierarchical commitments for multi-agent workflows;
 - policy preventing completion language until verification passes.
