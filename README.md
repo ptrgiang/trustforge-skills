@@ -1,7 +1,7 @@
 # TrustForge Skills
 
 [![CI](https://github.com/ptrgiang/trustforge-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/ptrgiang/trustforge-skills/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/badge/release-v0.5.0-7c3aed)](https://github.com/ptrgiang/trustforge-skills/releases/tag/v0.5.0)
+[![Release](https://img.shields.io/badge/release-v0.6.0-7c3aed)](https://github.com/ptrgiang/trustforge-skills/releases/tag/v0.6.0)
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)](pyproject.toml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
@@ -23,7 +23,7 @@ TrustForge does not try to be another agent framework. It sits around agent work
 | **DataLease** | Sends only the minimum necessary data to approved destinations | Released |
 | **FreshPlan** | Detects aging evidence and re-plans only affected branches | **v0.5.0** |
 | **CommitmentGuard** | Requires evidence before completion claims | MVP |
-| **ReproCapsule** | Packages failures, verifies replay, exports/replays container contexts, and gates trace redaction | **v0.6.0 release candidate** |
+| **ReproCapsule** | Packages failures, verifies replay, exports/replays container contexts, and gates trace redaction | **v0.6.0** |
 
 ## Who this is for
 
@@ -109,7 +109,7 @@ The benchmark uses synthetic adversarial traces. `secret_recall` measures how ma
 
 The bundled v0.6.0 release fixture is gated at 1.0/1.0. That is a regression baseline for the fixture, not a claim that arbitrary secrets are always detectable.
 
-## ReproCapsule v0.6.0 release candidate
+## ReproCapsule v0.6.0
 
 ```text
 failure context
@@ -147,7 +147,7 @@ See [`skills/reprocapsule/SKILL.md`](skills/reprocapsule/SKILL.md) and [`ROADMAP
 
 ## FreshPlan v0.5.0
 
-The latest stable release focuses on long-running plans that depend on time-sensitive evidence. FreshPlan supports provenance/freshness metadata, TTL/validity windows, named policies, selective invalidation, value-free refresh requests, trusted refresh adapters, replacement semantics, minimal plan patches, and deterministic large-graph regression tests.
+FreshPlan focuses on long-running plans that depend on time-sensitive evidence. It supports provenance/freshness metadata, TTL/validity windows, named policies, selective invalidation, value-free refresh requests, trusted refresh adapters, replacement semantics, minimal plan patches, and deterministic large-graph regression tests.
 
 Release notes: [`docs/releases/v0.5.0.md`](docs/releases/v0.5.0.md)
 
@@ -182,7 +182,7 @@ The goal is useful infrastructure with measurable boundaries, not perfect detect
 
 TrustForge is still pre-1.0 and is being developed in the open. The repository includes implementation, eval fixtures, known limitations, release checklists, benchmark gates, and design tradeoffs as they evolve.
 
-The active release candidate is **ReproCapsule v0.6.0**. Safe packaging, integrity-gated host replay, Docker/devcontainer export, explicit container replay, and adversarial redaction regression gates are implemented.
+The latest stable release is **v0.6.0**, centered on ReproCapsule: safe packaging, integrity-gated host replay, Docker/devcontainer export, explicit container replay, and adversarial redaction regression gates.
 
 ## Design principles
 
@@ -209,9 +209,9 @@ The active release candidate is **ReproCapsule v0.6.0**. Safe packaging, integri
 
 ## Release and compatibility
 
-- Release-candidate package version: **0.6.0**
-- Latest published stable release: **v0.5.0**
-- Floating stable GitHub Action ref: **`v0`**, still pinned to the stable release until v0.6.0 is published and verified
+- Package version: **0.6.0**
+- Latest stable release: **v0.6.0**
+- Floating stable GitHub Action ref: **`v0`**, currently pinned to the v0.6.0 release commit
 - License: Apache-2.0
 
 ## Contributing
