@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trustforge.dev/contracts/commitmentguard-attestation.schema.json",
+  "title": "TrustForge CommitmentGuard evidence attestation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "algorithm",
+    "issuer",
+    "key_id",
+    "observation_key",
+    "value_sha256",
+    "provenance_sha256",
+    "issued_at",
+    "expires_at",
+    "signature"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1"},
+    "algorithm": {"const": "Ed25519"},
+    "issuer": {"type": "string", "minLength": 1},
+    "key_id": {"type": "string", "minLength": 1},
+    "observation_key": {"type": "string", "minLength": 1},
+    "value_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "provenance_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "issued_at": {"type": "string", "format": "date-time"},
+    "expires_at": {
+      "anyOf": [
+        {"type": "string", "format": "date-time"},
+        {"type": "null"}
+      ]
+    },
+    "signature": {"type": "string", "minLength": 1}
+  }
+}

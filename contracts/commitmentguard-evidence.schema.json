@@ -21,6 +21,9 @@
             "type": "object",
             "additionalProperties": true,
             "minProperties": 1
+          },
+          "attestation": {
+            "$ref": "commitmentguard-attestation.schema.json"
           }
         }
       }

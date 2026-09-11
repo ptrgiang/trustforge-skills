@@ -34,6 +34,19 @@
                 "minItems": 1,
                 "uniqueItems": true,
                 "items": {"type": "string", "minLength": 1}
+              },
+              "require_attestation": {"type": "boolean"},
+              "allowed_attestation_issuers": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {"type": "string", "minLength": 1}
+              },
+              "allowed_attestation_key_ids": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {"type": "string", "minLength": 1}
               }
             },
             "additionalProperties": false,
@@ -43,6 +56,20 @@
               {"required": ["lte"]},
               {"required": ["truthy"]},
               {"required": ["contains"]}
+            ],
+            "allOf": [
+              {
+                "if": {
+                  "anyOf": [
+                    {"required": ["allowed_attestation_issuers"]},
+                    {"required": ["allowed_attestation_key_ids"]}
+                  ]
+                },
+                "then": {
+                  "required": ["require_attestation"],
+                  "properties": {"require_attestation": {"const": true}}
+                }
+              }
             ]
           },
           "waiver": {

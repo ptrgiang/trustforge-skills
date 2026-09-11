@@ -5,6 +5,13 @@ import json
 import sys
 from pathlib import Path
 
+from .commitment_attestation import (
+    AttestationError,
+    load_private_key_pem,
+    load_trust_registry,
+    sign_evidence_bundle,
+    verify_evidence_bundle_attestation,
+)
 from .commitment_evidence import (
     CommitmentEvidenceError,
     collect_api_diff,
@@ -33,6 +40,13 @@ from .reprocapsule_export import export_container, render_export_text
 from .skilldiff_v03 import compare, dumps as dump_skilldiff, dumps_sarif, render_text as render_skilldiff
 
 
+def _load_json_object(path: str | Path) -> dict:
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError("JSON document must be an object")
+    return data
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="trustforge", description="Trust and verification primitives for autonomous AI agents.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -48,6 +62,7 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("contract")
     verify.add_argument("--evidence", required=True)
     verify.add_argument("--as-of", default=None, help="ISO-8601 evaluation time for evidence freshness and waiver expiry")
+    verify.add_argument("--trust-registry", default=None, help="Attestation public-key trust registry JSON")
     verify.add_argument("--json", action="store_true", dest="as_json")
     verify.add_argument(
         "--accept-partial",
@@ -55,7 +70,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Exit successfully when all required commitments pass/are waived even if optional commitments remain incomplete",
     )
 
-    evidence = sub.add_parser("evidence", help="Collect CommitmentGuard evidence from trusted developer workflows")
+    evidence = sub.add_parser("evidence", help="Collect, sign, and verify CommitmentGuard evidence")
     evidence_sub = evidence.add_subparsers(dest="evidence_command", required=True)
     evidence_command = evidence_sub.add_parser("command", help="Run an explicit command and emit exit-success evidence")
     evidence_command.add_argument("--key", required=True, help="Observation key to write")
@@ -94,6 +109,19 @@ def build_parser() -> argparse.ArgumentParser:
     evidence_json.add_argument("--input", required=True, dest="input_path", help="JSON artifact path")
     evidence_json.add_argument("--value-path", required=True, help="Dotted value path; numeric components index arrays")
     evidence_json.add_argument("--observed-at", default=None, help="Optional deterministic ISO-8601 observation time")
+    evidence_sign = evidence_sub.add_parser("sign", help="Attach an Ed25519 attestation to one evidence observation")
+    evidence_sign.add_argument("--input", required=True, dest="input_path", help="Evidence bundle JSON")
+    evidence_sign.add_argument("--key", required=True, help="Observation key to attest")
+    evidence_sign.add_argument("--private-key", required=True, help="Unencrypted Ed25519 private-key PEM file")
+    evidence_sign.add_argument("--issuer", required=True, help="Attestation issuer identifier")
+    evidence_sign.add_argument("--key-id", required=True, help="Attestation key identifier")
+    evidence_sign.add_argument("--issued-at", required=True, help="ISO-8601 issue time")
+    evidence_sign.add_argument("--expires-at", default=None, help="Optional ISO-8601 expiry time")
+    evidence_verify = evidence_sub.add_parser("verify-attestation", help="Verify one signed evidence observation")
+    evidence_verify.add_argument("--input", required=True, dest="input_path", help="Signed evidence bundle JSON")
+    evidence_verify.add_argument("--key", required=True, help="Observation key to verify")
+    evidence_verify.add_argument("--trust-registry", required=True, help="Attestation public-key trust registry JSON")
+    evidence_verify.add_argument("--as-of", default=None, help="Optional deterministic ISO-8601 verification time")
 
     datalease = sub.add_parser("datalease", help="Apply and evaluate purpose-bound data minimization policies")
     datalease_sub = datalease.add_subparsers(dest="datalease_command", required=True)
@@ -176,8 +204,14 @@ def main(argv: list[str] | None = None) -> int:
         return 2 if args.fail_on and _risk_rank(report["risk"]["level"]) >= _risk_rank(args.fail_on) else 0
     if args.command == "verify":
         try:
-            report = verify_files(args.contract, args.evidence, as_of=args.as_of)
-        except CommitmentGuardError as exc:
+            trusted_keys = load_trust_registry(args.trust_registry) if args.trust_registry else None
+            report = verify_files(
+                args.contract,
+                args.evidence,
+                as_of=args.as_of,
+                trusted_attestation_keys=trusted_keys,
+            )
+        except (CommitmentGuardError, AttestationError, OSError, json.JSONDecodeError) as exc:
             print(f"CommitmentGuard error: {exc}", file=sys.stderr)
             return 3
         print(json.dumps(report, indent=2, sort_keys=True) if args.as_json else render_commitments(report))
@@ -268,6 +302,39 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Commitment evidence error: {exc}", file=sys.stderr)
             return 8
         print(dump_commitment_evidence(bundle))
+        return 0
+    if args.command == "evidence" and args.evidence_command == "sign":
+        try:
+            bundle = _load_json_object(args.input_path)
+            private_key = load_private_key_pem(Path(args.private_key).read_bytes())
+            signed = sign_evidence_bundle(
+                bundle,
+                observation_key=args.key,
+                private_key=private_key,
+                issuer=args.issuer,
+                key_id=args.key_id,
+                issued_at=args.issued_at,
+                expires_at=args.expires_at,
+            )
+        except (AttestationError, OSError, json.JSONDecodeError, ValueError) as exc:
+            print(f"Commitment attestation error: {exc}", file=sys.stderr)
+            return 8
+        print(json.dumps(signed, indent=2, sort_keys=True))
+        return 0
+    if args.command == "evidence" and args.evidence_command == "verify-attestation":
+        try:
+            bundle = _load_json_object(args.input_path)
+            trusted = load_trust_registry(args.trust_registry)
+            result = verify_evidence_bundle_attestation(
+                bundle,
+                observation_key=args.key,
+                trusted_keys=trusted,
+                as_of=args.as_of,
+            )
+        except (AttestationError, OSError, json.JSONDecodeError, ValueError) as exc:
+            print(f"Commitment attestation error: {exc}", file=sys.stderr)
+            return 8
+        print(json.dumps(result, indent=2, sort_keys=True))
         return 0
     if args.command == "datalease" and args.datalease_command == "apply":
         try:

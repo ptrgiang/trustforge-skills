@@ -3,7 +3,11 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
+
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
+from .commitment_attestation import AttestationError, verify_observation_attestation
 
 
 class CommitmentGuardError(ValueError):
@@ -81,6 +85,14 @@ def _check(actual: Any, rule: dict[str, Any]) -> tuple[str, str]:
     return ("PASS", f"contains {expected!r}") if ok else ("FAIL", f"expected value containing {expected!r}, got {actual!r}")
 
 
+def _validate_string_list(cid: str, rule: dict[str, Any], field: str) -> None:
+    if field not in rule:
+        return
+    values = rule[field]
+    if not isinstance(values, list) or not values or not all(isinstance(item, str) and item for item in values):
+        raise CommitmentGuardError(f"commitment {cid}.evidence.{field} must be a non-empty list of strings")
+
+
 def _validate_evidence_rule(cid: str, rule: Any) -> None:
     if not isinstance(rule, dict) or not isinstance(rule.get("key"), str) or not rule["key"]:
         return
@@ -88,10 +100,14 @@ def _validate_evidence_rule(cid: str, rule: Any) -> None:
         value = rule["max_age_seconds"]
         if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
             raise CommitmentGuardError(f"commitment {cid}.evidence.max_age_seconds must be a non-negative number")
-    if "allowed_source_kinds" in rule:
-        kinds = rule["allowed_source_kinds"]
-        if not isinstance(kinds, list) or not kinds or not all(isinstance(item, str) and item for item in kinds):
-            raise CommitmentGuardError(f"commitment {cid}.evidence.allowed_source_kinds must be a non-empty list of strings")
+    for field in ("allowed_source_kinds", "allowed_attestation_issuers", "allowed_attestation_key_ids"):
+        _validate_string_list(cid, rule, field)
+    if "require_attestation" in rule and not isinstance(rule["require_attestation"], bool):
+        raise CommitmentGuardError(f"commitment {cid}.evidence.require_attestation must be boolean")
+    if ("allowed_attestation_issuers" in rule or "allowed_attestation_key_ids" in rule) and rule.get("require_attestation") is not True:
+        raise CommitmentGuardError(
+            f"commitment {cid}.evidence.require_attestation must be true when attestation issuer/key policy is configured"
+        )
 
 
 def _validate_contract(contract: dict[str, Any]) -> list[dict[str, Any]]:
@@ -132,12 +148,15 @@ def _validate_evidence_bundle(evidence: dict[str, Any]) -> None:
         raise CommitmentGuardError("evidence.observations must be an object")
 
 
-def _observation(evidence: dict[str, Any], key: str) -> tuple[bool, Any, dict[str, Any] | None]:
+def _observation(
+    evidence: dict[str, Any],
+    key: str,
+) -> tuple[bool, Any, dict[str, Any] | None, dict[str, Any] | None]:
     observations = evidence.get("observations")
     if isinstance(observations, dict):
         item = observations.get(key)
         if item is None:
-            return False, None, None
+            return False, None, None, None
         if not isinstance(item, dict) or "value" not in item:
             raise CommitmentGuardError(f"evidence observation {key!r} must be an object with value")
         provenance: dict[str, Any] = {}
@@ -150,10 +169,52 @@ def _observation(evidence: dict[str, Any], key: str) -> tuple[bool, Any, dict[st
                 raise CommitmentGuardError(f"evidence observation {key!r}.observed_at must be a non-empty string")
             _parse_time(item["observed_at"], f"evidence observation {key!r}.observed_at")
             provenance["observed_at"] = item["observed_at"]
-        return True, item["value"], provenance or None
+        attestation = item.get("attestation")
+        if attestation is not None and not isinstance(attestation, dict):
+            raise CommitmentGuardError(f"evidence observation {key!r}.attestation must be an object")
+        return True, item["value"], provenance or None, attestation
 
     found, actual = _get_nested(evidence, key)
-    return found, actual, None
+    return found, actual, None, None
+
+
+def _check_attestation_policy(
+    rule: dict[str, Any],
+    *,
+    key: str,
+    actual: Any,
+    provenance: dict[str, Any] | None,
+    attestation: dict[str, Any] | None,
+    as_of: datetime,
+    trusted_attestation_keys: Mapping[tuple[str, str], Ed25519PublicKey] | None,
+) -> tuple[tuple[str, str] | None, dict[str, Any] | None]:
+    if rule.get("require_attestation") is not True:
+        return None, None
+    if attestation is None:
+        return ("UNKNOWN", "evidence attestation required by policy"), None
+    if not trusted_attestation_keys:
+        return ("UNKNOWN", "trusted attestation keys required by policy"), None
+
+    as_of_text = as_of.isoformat().replace("+00:00", "Z")
+    try:
+        verification = verify_observation_attestation(
+            observation_key=key,
+            value=actual,
+            provenance=provenance,
+            attestation=attestation,
+            trusted_keys=trusted_attestation_keys,
+            as_of=as_of_text,
+        )
+    except AttestationError as exc:
+        return ("UNKNOWN", f"attestation verification failed: {exc}"), None
+
+    allowed_issuers = rule.get("allowed_attestation_issuers")
+    if allowed_issuers is not None and verification["issuer"] not in allowed_issuers:
+        return ("UNKNOWN", f"attestation issuer {verification['issuer']!r} is not allowed"), None
+    allowed_key_ids = rule.get("allowed_attestation_key_ids")
+    if allowed_key_ids is not None and verification["key_id"] not in allowed_key_ids:
+        return ("UNKNOWN", f"attestation key_id {verification['key_id']!r} is not allowed"), None
+    return None, verification
 
 
 def _check_evidence_policy(
@@ -243,6 +304,7 @@ def verify(
     evidence: dict[str, Any],
     *,
     as_of: str | None = None,
+    trusted_attestation_keys: Mapping[tuple[str, str], Ed25519PublicKey] | None = None,
 ) -> dict[str, Any]:
     commitments = _validate_contract(contract)
     _validate_evidence_bundle(evidence)
@@ -271,7 +333,7 @@ def verify(
             continue
 
         key = rule["key"]
-        found, actual, provenance = _observation(evidence, key)
+        found, actual, provenance, attestation = _observation(evidence, key)
         if not found:
             results.append({
                 "id": cid,
@@ -283,11 +345,23 @@ def verify(
             })
             continue
 
-        policy_result = _check_evidence_policy(rule, provenance, evaluation_time)
-        if policy_result is not None:
-            status, detail = policy_result
+        attestation_result, attestation_verification = _check_attestation_policy(
+            rule,
+            key=key,
+            actual=actual,
+            provenance=provenance,
+            attestation=attestation,
+            as_of=evaluation_time,
+            trusted_attestation_keys=trusted_attestation_keys,
+        )
+        if attestation_result is not None:
+            status, detail = attestation_result
         else:
-            status, detail = _check(actual, rule)
+            policy_result = _check_evidence_policy(rule, provenance, evaluation_time)
+            if policy_result is not None:
+                status, detail = policy_result
+            else:
+                status, detail = _check(actual, rule)
 
         result: dict[str, Any] = {
             "id": cid,
@@ -300,6 +374,8 @@ def verify(
         }
         if provenance is not None:
             result["provenance"] = provenance
+        if attestation_verification is not None:
+            result["attestation"] = attestation_verification
         results.append(result)
 
     required_blockers = [
@@ -336,8 +412,14 @@ def verify_files(
     evidence_path: str | Path,
     *,
     as_of: str | None = None,
+    trusted_attestation_keys: Mapping[tuple[str, str], Ed25519PublicKey] | None = None,
 ) -> dict[str, Any]:
-    return verify(_load_json(contract_path), _load_json(evidence_path), as_of=as_of)
+    return verify(
+        _load_json(contract_path),
+        _load_json(evidence_path),
+        as_of=as_of,
+        trusted_attestation_keys=trusted_attestation_keys,
+    )
 
 
 def render_text(report: dict[str, Any]) -> str:
@@ -354,5 +436,10 @@ def render_text(report: dict[str, Any]) -> str:
                 lines.append(f"  source: {json.dumps(source, sort_keys=True)}")
             if observed_at:
                 lines.append(f"  observed_at: {observed_at}")
+        attestation = item.get("attestation")
+        if attestation:
+            lines.append(
+                f"  attestation: verified issuer={attestation['issuer']!r} key_id={attestation['key_id']!r}"
+            )
     lines.extend(["", f"Result: {report['completion_state'].upper()}"])
     return "\n".join(lines)
