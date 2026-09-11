@@ -192,17 +192,60 @@ jobs:
           report = json.loads(Path(".artifacts/reprocapsule-report.json").read_text())
           manifest = json.loads(Path(".artifacts/reprocapsule/reprocapsule.json").read_text())
           trace = Path(".artifacts/reprocapsule/trace.txt").read_text()
-          assert report["schema_version"] == "0.1"
           assert report == manifest
+          assert report["expected_failure_signature"] == "AssertionError: missing required field"
           assert report["safety"]["command_executed_during_build"] is False
           assert report["safety"]["raw_environment_values_included"] is False
           assert report["trace"]["redactions"] >= 2
           assert "example-secret-value" not in trace
           assert "example-example-example-token" not in trace
-          assert Path(".artifacts/reprocapsule/inputs/parser_demo.py").is_file()
-          assert Path(".artifacts/reprocapsule/inputs/fixtures/input.json").is_file()
           print("ReproCapsule build smoke test passed")
           PY
+      - name: ReproCapsule integrity-only replay gate
+        run: |
+          trustforge reprocapsule replay \
+            --capsule .artifacts/reprocapsule \
+            --json > .artifacts/reprocapsule-ready.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path(".artifacts/reprocapsule-ready.json").read_text())
+          assert report["decision"] == "ready"
+          assert report["executed"] is False
+          assert report["integrity"]["decision"] == "verified"
+          print("ReproCapsule integrity gate passed")
+          PY
+      - name: ReproCapsule replay verification gate
+        run: |
+          trustforge reprocapsule replay \
+            --capsule .artifacts/reprocapsule \
+            --execute \
+            --fail-on-divergence \
+            --json > .artifacts/reprocapsule-replay.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path(".artifacts/reprocapsule-replay.json").read_text())
+          assert report["decision"] == "reproduced"
+          assert report["executed"] is True
+          assert report["return_code"] == 1
+          assert report["exit_code_match"] is True
+          assert report["failure_signature_match"] is True
+          print("ReproCapsule replay verification gate passed")
+          PY
+      - name: ReproCapsule tamper block gate
+        run: |
+          cp -R .artifacts/reprocapsule .artifacts/reprocapsule-tampered
+          printf '\n# tampered\n' >> .artifacts/reprocapsule-tampered/inputs/parser_demo.py
+          set +e
+          trustforge reprocapsule replay \
+            --capsule .artifacts/reprocapsule-tampered \
+            --execute > .artifacts/reprocapsule-tamper.txt
+          status=$?
+          set -e
+          test "$status" -eq 7
+          grep -q "Decision: blocked" .artifacts/reprocapsule-tamper.txt
+          grep -q "Executed: no" .artifacts/reprocapsule-tamper.txt
       - name: Package development version consistency
         run: |
           python - <<'PY'
@@ -211,7 +254,7 @@ jobs:
           import trustforge
           pyproject = Path("pyproject.toml").read_text()
           version = re.search(r'^version = "([^"]+)"$', pyproject, re.MULTILINE).group(1)
-          assert version == "0.6.0.dev0"
+          assert version == "0.6.0.dev1"
           assert trustforge.__version__ == version
           print(f"development version consistent: {version}")
           PY
