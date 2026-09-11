@@ -41,6 +41,7 @@ from .reprocapsule import (
     replay_capsule,
     render_text as render_reprocapsule,
 )
+from .reprocapsule_export import export_container
 from .skilldiff_v03 import compare, dumps as dump_skilldiff, dumps_sarif, render_text as render_skilldiff
 
 
@@ -133,6 +134,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Exit 7 unless replay reproduces the declared failure",
     )
+
+    reprocapsule_export = reprocapsule_sub.add_parser(
+        "export-container",
+        help="Export a verified capsule as a Docker/devcontainer build context",
+    )
+    reprocapsule_export.add_argument("--capsule", required=True, help="Path to a built capsule directory")
+    reprocapsule_export.add_argument("--output", required=True, help="Directory for the generated container context")
+    reprocapsule_export.add_argument("--json", action="store_true", dest="as_json")
 
     return parser
 
@@ -261,6 +270,15 @@ def main(argv: list[str] | None = None) -> int:
         if args.fail_on_divergence and report["decision"] != "reproduced":
             return 7
         return 0 if report["decision"] not in {"blocked", "diverged"} else 7
+
+    if args.command == "reprocapsule" and args.reprocapsule_command == "export-container":
+        try:
+            report = export_container(args.capsule, args.output)
+        except (ReproCapsuleError, OSError) as exc:
+            print(f"ReproCapsule container export error: {exc}", file=sys.stderr)
+            return 7
+        print(dump_reprocapsule(report) if args.as_json else render_reprocapsule(report))
+        return 0 if report["decision"] == "exported" else 7
 
     return 1
 
