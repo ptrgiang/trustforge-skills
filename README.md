@@ -1,7 +1,7 @@
 # TrustForge Skills
 
 [![CI](https://github.com/ptrgiang/trustforge-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/ptrgiang/trustforge-skills/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/badge/release-v0.4.0-7c3aed)](https://github.com/ptrgiang/trustforge-skills/releases/tag/v0.4.0)
+[![Release](https://img.shields.io/badge/release-v0.5.0-7c3aed)](https://github.com/ptrgiang/trustforge-skills/releases/tag/v0.5.0)
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)](pyproject.toml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
@@ -14,12 +14,12 @@ TrustForge Skills is an open-source collection of reliability, verification, pri
 | Skill | Purpose | Status |
 | --- | --- | --- |
 | **SkillDiff** | Detect trust-boundary changes between skill versions | **v0.3 released** |
-| **DataLease** | Purpose- and destination-bound minimum-necessary data sharing | **v0.4.0 released** |
-| **FreshPlan** | Refresh aging evidence and re-plan only affected branches | **v0.5 development** |
+| **DataLease** | Purpose- and destination-bound minimum-necessary data sharing | **v0.4 released** |
+| **FreshPlan** | Refresh aging evidence and re-plan only affected branches | **v0.5.0** |
 | **CommitmentGuard** | Require evidence before an agent can claim completion | MVP |
 | **ReproCapsule** | Package failures into reproducible environments | Planned |
 
-## FreshPlan v0.5 development
+## FreshPlan v0.5
 
 FreshPlan makes freshness explicit for long-running agent plans:
 
@@ -151,7 +151,7 @@ trustforge freshplan benchmark \
   --max-median-ms 5000
 ```
 
-The benchmark reports nodes, facts, edges, median/min/max runtime, throughput, stale facts, and invalidated nodes. The CI threshold is deliberately generous and is a regression alarm, not a universal performance guarantee.
+The benchmark reports nodes, facts, edges, median/min/max runtime, throughput, stale facts, and invalidated nodes. The CI threshold is deliberately generous and is a regression alarm, not a universal performance guarantee or SLA.
 
 Contracts:
 
@@ -159,6 +159,8 @@ Contracts:
 - [`contracts/freshplan-refresh-request.schema.json`](contracts/freshplan-refresh-request.schema.json)
 - [`contracts/freshplan-replacement.schema.json`](contracts/freshplan-replacement.schema.json)
 - [`contracts/freshplan-patch.schema.json`](contracts/freshplan-patch.schema.json)
+
+Release notes: [`docs/releases/v0.5.0.md`](docs/releases/v0.5.0.md).
 
 ## DataLease v0.4
 
@@ -310,10 +312,10 @@ SkillDiff → DataLease → FreshPlan → CommitmentGuard → ReproCapsule
 
 ## Release and compatibility
 
-- Current development package version: **0.5.0.dev2**.
-- Latest stable release: **v0.4.0**.
-- Floating stable GitHub Action ref: **`v0`**, still pinned to the v0.4.0 release line while FreshPlan develops on `main`.
-- Stable release notes: [`docs/releases/v0.4.0.md`](docs/releases/v0.4.0.md).
+- Current package version: **0.5.0**.
+- Latest stable release: **v0.5.0**.
+- Floating stable GitHub Action ref: **`v0`**; it is advanced only after a release tag and GitHub Release are verified.
+- FreshPlan contracts remain on schema version **`0.1`** for the v0.5.0 release line.
 
 ## Roadmap
 
