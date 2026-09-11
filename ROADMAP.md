@@ -106,8 +106,8 @@ Freshness-aware dependency graphs and conservative recovery for long-running age
 - [x] Freeze FreshPlan contract/version compatibility notes
 - [x] Prepare v0.5.0 release notes and checklist
 - [x] Finalize package/runtime version to `0.5.0`
-- [ ] Run final CI/release-candidate matrix
-- [ ] Release `v0.5.0` and advance stable `v0` only after verification
+- [x] Run final CI/release-candidate matrix
+- [x] Release `v0.5.0` and advance stable `v0`
 
 ### FreshPlan research backlog
 
@@ -119,13 +119,28 @@ Freshness-aware dependency graphs and conservative recovery for long-running age
 
 ## v0.6 — ReproCapsule
 
-Portable failure reproduction for coding agents.
+Portable failure reproduction for coding agents and autonomous debugging workflows.
 
-- environment fingerprint;
-- minimal failing inputs;
-- sanitized traces;
-- Docker/devcontainer export;
-- replay verification.
+- [x] ReproCapsule build spec and schema v0.1
+- [x] Environment fingerprint without raw environment values
+- [x] Explicit failing-input packaging with SHA-256 integrity metadata
+- [x] Sanitized trace packaging
+- [x] Fail-closed sensitive path and secret-like command checks
+- [x] `trustforge reprocapsule build` CLI
+- [x] Example capsule fixture, unit tests, and CI smoke gate
+- [ ] Replay verification with expected exit code / failure signature
+- [ ] Replay integrity checks before command execution
+- [ ] Dockerfile/devcontainer export
+- [ ] Additional trace redaction benchmark/adversarial fixtures
+- [ ] Release hardening for `v0.6.0`
+
+### ReproCapsule research backlog
+
+- [ ] Cross-platform dependency/environment lock capture
+- [ ] Framework adapters for coding-agent traces
+- [ ] Sandboxed replay runner
+- [ ] Reproduction minimization / input reduction
+- [ ] Signed capsule manifests
 
 ## v1.0 goal
 
