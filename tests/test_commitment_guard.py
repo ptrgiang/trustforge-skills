@@ -28,7 +28,7 @@ class CommitmentGuardV07Tests(unittest.TestCase):
             },
         }
 
-        report = verify(contract, evidence)
+        report = verify(contract, evidence, as_of="2026-09-11T14:01:00Z")
 
         self.assertEqual(report["completion_state"], "verified_complete")
         self.assertTrue(report["verified_complete"])
@@ -60,7 +60,7 @@ class CommitmentGuardV07Tests(unittest.TestCase):
             },
         }
 
-        report = verify(contract, evidence)
+        report = verify(contract, evidence, as_of="2026-09-11T14:01:00Z")
 
         self.assertEqual(report["completion_state"], "partial")
         self.assertFalse(report["verified_complete"])
@@ -83,7 +83,7 @@ class CommitmentGuardV07Tests(unittest.TestCase):
             "observations": {"dependencies.added": {"value": ["requests"]}},
         }
 
-        report = verify(contract, evidence)
+        report = verify(contract, evidence, as_of="2026-09-11T14:01:00Z")
 
         self.assertEqual(report["completion_state"], "not_verified")
         self.assertFalse(report["required_satisfied"])
@@ -105,10 +105,154 @@ class CommitmentGuardV07Tests(unittest.TestCase):
             ],
         }
 
-        report = verify(contract, {})
+        report = verify(contract, {}, as_of="2026-09-11T14:01:00Z")
 
         self.assertEqual(report["completion_state"], "verified_complete")
         self.assertEqual(report["commitments"][0]["waiver"]["ticket"], "INC-42")
+
+    def test_expired_waiver_fails_closed(self):
+        contract = {
+            "schema_version": "0.2",
+            "commitments": [
+                {
+                    "id": "C1",
+                    "description": "Coverage is 95%",
+                    "waiver": {
+                        "reason": "Temporary exception",
+                        "expires_at": "2026-09-11T14:00:00Z",
+                    },
+                }
+            ],
+        }
+
+        report = verify(contract, {}, as_of="2026-09-11T14:01:00Z")
+
+        self.assertEqual(report["completion_state"], "not_verified")
+        self.assertEqual(report["commitments"][0]["status"], "UNKNOWN")
+        self.assertIn("expired", report["commitments"][0]["detail"])
+
+    def test_stale_evidence_fails_closed(self):
+        contract = {
+            "schema_version": "0.2",
+            "commitments": [
+                {
+                    "id": "C1",
+                    "description": "Tests pass recently",
+                    "evidence": {
+                        "key": "tests.passed",
+                        "truthy": True,
+                        "max_age_seconds": 60,
+                    },
+                }
+            ],
+        }
+        evidence = {
+            "schema_version": "0.2",
+            "observations": {
+                "tests.passed": {
+                    "value": True,
+                    "observed_at": "2026-09-11T13:58:00Z",
+                }
+            },
+        }
+
+        report = verify(contract, evidence, as_of="2026-09-11T14:00:00Z")
+
+        self.assertEqual(report["completion_state"], "not_verified")
+        self.assertEqual(report["commitments"][0]["status"], "UNKNOWN")
+        self.assertIn("stale", report["commitments"][0]["detail"])
+
+    def test_future_dated_evidence_fails_closed(self):
+        contract = {
+            "schema_version": "0.2",
+            "commitments": [
+                {
+                    "id": "C1",
+                    "description": "Tests pass recently",
+                    "evidence": {
+                        "key": "tests.passed",
+                        "truthy": True,
+                        "max_age_seconds": 300,
+                    },
+                }
+            ],
+        }
+        evidence = {
+            "schema_version": "0.2",
+            "observations": {
+                "tests.passed": {
+                    "value": True,
+                    "observed_at": "2026-09-11T14:02:00Z",
+                }
+            },
+        }
+
+        report = verify(contract, evidence, as_of="2026-09-11T14:00:00Z")
+
+        self.assertEqual(report["commitments"][0]["status"], "UNKNOWN")
+        self.assertIn("future-dated", report["commitments"][0]["detail"])
+
+    def test_untrusted_source_kind_fails_closed(self):
+        contract = {
+            "schema_version": "0.2",
+            "commitments": [
+                {
+                    "id": "C1",
+                    "description": "Tests pass from CI",
+                    "evidence": {
+                        "key": "tests.passed",
+                        "truthy": True,
+                        "allowed_source_kinds": ["ci", "command"],
+                    },
+                }
+            ],
+        }
+        evidence = {
+            "schema_version": "0.2",
+            "observations": {
+                "tests.passed": {
+                    "value": True,
+                    "source": {"kind": "agent-claim", "ref": "final-answer"},
+                }
+            },
+        }
+
+        report = verify(contract, evidence, as_of="2026-09-11T14:00:00Z")
+
+        self.assertEqual(report["completion_state"], "not_verified")
+        self.assertEqual(report["commitments"][0]["status"], "UNKNOWN")
+        self.assertIn("not allowed", report["commitments"][0]["detail"])
+
+    def test_allowed_source_and_fresh_evidence_pass(self):
+        contract = {
+            "schema_version": "0.2",
+            "commitments": [
+                {
+                    "id": "C1",
+                    "description": "Tests pass from fresh CI evidence",
+                    "evidence": {
+                        "key": "tests.passed",
+                        "truthy": True,
+                        "max_age_seconds": 300,
+                        "allowed_source_kinds": ["ci"],
+                    },
+                }
+            ],
+        }
+        evidence = {
+            "schema_version": "0.2",
+            "observations": {
+                "tests.passed": {
+                    "value": True,
+                    "observed_at": "2026-09-11T13:59:00Z",
+                    "source": {"kind": "ci", "ref": "run-123"},
+                }
+            },
+        }
+
+        report = verify(contract, evidence, as_of="2026-09-11T14:00:00Z")
+
+        self.assertTrue(report["verified_complete"])
 
     def test_duplicate_commitment_ids_fail_closed(self):
         contract = {
@@ -119,7 +263,7 @@ class CommitmentGuardV07Tests(unittest.TestCase):
             ],
         }
         with self.assertRaises(CommitmentGuardError):
-            verify(contract, {})
+            verify(contract, {}, as_of="2026-09-11T14:00:00Z")
 
     def test_legacy_nested_evidence_remains_compatible(self):
         contract = {
@@ -131,7 +275,7 @@ class CommitmentGuardV07Tests(unittest.TestCase):
                 }
             ]
         }
-        report = verify(contract, {"tests": {"coverage": 92}})
+        report = verify(contract, {"tests": {"coverage": 92}}, as_of="2026-09-11T14:00:00Z")
         self.assertTrue(report["verified_complete"])
         self.assertEqual(report["completion_state"], "verified_complete")
 
