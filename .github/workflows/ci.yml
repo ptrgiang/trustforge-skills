@@ -69,7 +69,34 @@ jobs:
             --min-precision 0.90 \
             --min-recall 0.90 \
             > .artifacts/datalease-benchmark-multilingual.json
-      - name: Release version consistency
+      - name: FreshPlan selective invalidation smoke test
+        run: |
+          trustforge freshplan check \
+            --plan evals/freshplan/selective-invalidation/plan.yaml \
+            --as-of "2026-09-11T09:30:00Z" \
+            --json > .artifacts/freshplan.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path(".artifacts/freshplan.json").read_text())
+          expected = json.loads(Path("evals/freshplan/selective-invalidation/expected.json").read_text())
+          assert report["decision"] == "replan_required"
+          for key in ("as_of", "stale_facts", "replan_order", "unaffected_nodes"):
+              assert report[key] == expected[key], (key, report[key], expected[key])
+          print("FreshPlan selective invalidation smoke test passed")
+          PY
+      - name: FreshPlan stale gate exit code
+        run: |
+          set +e
+          trustforge freshplan check \
+            --plan evals/freshplan/selective-invalidation/plan.yaml \
+            --as-of "2026-09-11T09:30:00Z" \
+            --fail-on-stale > /dev/null
+          status=$?
+          set -e
+          test "$status" -eq 6
+      - name: Package development version consistency
         run: |
           python - <<'PY'
           import re
@@ -78,9 +105,9 @@ jobs:
 
           pyproject = Path("pyproject.toml").read_text()
           version = re.search(r'^version = "([^"]+)"$', pyproject, re.MULTILINE).group(1)
-          assert version == "0.4.0"
+          assert version == "0.5.0.dev0"
           assert trustforge.__version__ == version
-          print(f"release version consistent: {version}")
+          print(f"development version consistent: {version}")
           PY
 
   action-smoke:

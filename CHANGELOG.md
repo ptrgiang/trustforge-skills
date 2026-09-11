@@ -6,9 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- FreshPlan v0.5 MVP for freshness-aware plan dependency graphs.
+- Fact provenance plus TTL/absolute validity windows.
+- Selective invalidation from stale facts through dependent plan nodes.
+- Root-cause propagation and dependency-safe `replan_order` output.
+- `trustforge freshplan check` CLI with deterministic `--as-of` and `--fail-on-stale` gating.
+- FreshPlan JSON Schema, example plan, unit tests, selective-invalidation eval fixture, and CI smoke gate.
+
+### Changed
+
+- Development package version advanced to `0.5.0.dev0` while stable `v0` remains on `v0.4.0`.
+
 ### Planned
 
-- FreshPlan freshness-aware dependency graphs.
+- FreshPlan fact refresh adapters and explicit plan patch format.
+- Larger FreshPlan graph benchmarks and richer freshness policies.
 - Larger multilingual/domain-specific DataLease benchmarks.
 - JavaScript/TypeScript structured SkillDiff detectors.
 - Transitive dependency capability analysis.

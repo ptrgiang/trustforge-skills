@@ -67,6 +67,7 @@ Purpose- and destination-bound minimum-necessary data projection before tool/API
 - [x] Multilingual/domain regression fixture
 - [x] Built-in classifier label/version contract
 - [x] Release notes and release checklist
+- [x] Release `v0.4.0` and advance stable `v0`
 
 ### DataLease research backlog
 
@@ -79,10 +80,25 @@ Purpose- and destination-bound minimum-necessary data projection before tool/API
 
 Freshness-aware dependency graphs for long-running agents.
 
-- fact provenance;
-- TTL/validity windows;
-- dependency edges from facts to plan nodes;
-- selective invalidation and re-planning.
+- [x] Metadata-only fact contract with provenance
+- [x] TTL and explicit `valid_until` freshness windows
+- [x] Dependency edges from facts to plan nodes and node-to-node edges
+- [x] Timezone-aware deterministic `--as-of` evaluation
+- [x] Fail-closed handling for future-dated observations
+- [x] Selective invalidation instead of whole-plan invalidation
+- [x] Root stale-fact propagation through affected descendants
+- [x] Topological `replan_order` plus unaffected-node reporting
+- [x] Cycle, self-dependency, and unknown-reference rejection
+- [x] CLI, JSON output, and `--fail-on-stale` orchestration gate
+- [x] JSON Schema, example, unit tests, eval fixture, and CI smoke gate
+
+### FreshPlan research backlog
+
+- [ ] Fact refresh adapters
+- [ ] Explicit replacement-evidence / plan-patch format
+- [ ] Large-graph performance benchmarks
+- [ ] Richer freshness policies beyond TTL and absolute expiry
+- [ ] Runtime adapters for long-running agent frameworks
 
 ## v0.6 — ReproCapsule
 
