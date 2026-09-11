@@ -9,6 +9,7 @@ from .commitment_evidence import (
     CommitmentEvidenceError,
     collect_command_exit,
     collect_json_artifact,
+    collect_pytest,
     dumps as dump_commitment_evidence,
 )
 from .commitment_guard import CommitmentGuardError, render_text as render_commitments, verify_files
@@ -58,6 +59,12 @@ def build_parser() -> argparse.ArgumentParser:
     evidence_command.add_argument("--observed-at", default=None, help="Optional deterministic ISO-8601 observation time")
     evidence_command.add_argument("--timeout", type=float, default=30.0, help="Command timeout in seconds, max 300")
     evidence_command.add_argument("argv", nargs=argparse.REMAINDER, help="Command argv after --")
+    evidence_pytest = evidence_sub.add_parser("pytest", help="Run python -m pytest and emit normalized pytest evidence")
+    evidence_pytest.add_argument("--key", default="tests.passed", help="Observation key to write")
+    evidence_pytest.add_argument("--python", default=sys.executable, dest="python_executable", help="Python executable used to run pytest")
+    evidence_pytest.add_argument("--observed-at", default=None, help="Optional deterministic ISO-8601 observation time")
+    evidence_pytest.add_argument("--timeout", type=float, default=120.0, help="Pytest timeout in seconds, max 300")
+    evidence_pytest.add_argument("pytest_args", nargs=argparse.REMAINDER, help="Optional pytest argv after --")
     evidence_json = evidence_sub.add_parser("json-artifact", help="Extract one value from a JSON artifact with hash provenance")
     evidence_json.add_argument("--key", required=True, help="Observation key to write")
     evidence_json.add_argument("--input", required=True, dest="input_path", help="JSON artifact path")
@@ -163,6 +170,23 @@ def main(argv: list[str] | None = None) -> int:
             bundle = collect_command_exit(
                 args.key,
                 argv,
+                observed_at=args.observed_at,
+                timeout_seconds=args.timeout,
+            )
+        except CommitmentEvidenceError as exc:
+            print(f"Commitment evidence error: {exc}", file=sys.stderr)
+            return 8
+        print(dump_commitment_evidence(bundle))
+        return 0
+    if args.command == "evidence" and args.evidence_command == "pytest":
+        pytest_args = list(args.pytest_args)
+        if pytest_args and pytest_args[0] == "--":
+            pytest_args = pytest_args[1:]
+        try:
+            bundle = collect_pytest(
+                args.key,
+                pytest_args,
+                python_executable=args.python_executable,
                 observed_at=args.observed_at,
                 timeout_seconds=args.timeout,
             )
