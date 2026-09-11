@@ -38,6 +38,8 @@ def main() -> int:
         "examples/refactor-contract.json",
         "--evidence",
         "examples/refactor-evidence.json",
+        "--as-of",
+        "2026-09-11T14:01:00Z",
     )
 
     partial = subprocess.run(
@@ -49,6 +51,8 @@ def main() -> int:
             "examples/commitmentguard/release-contract.json",
             "--evidence",
             "examples/commitmentguard/release-evidence.json",
+            "--as-of",
+            "2026-09-11T14:01:00Z",
             "--json",
         ],
         cwd=ROOT,
@@ -56,10 +60,12 @@ def main() -> int:
         capture_output=True,
     )
     if partial.returncode != 3:
-        raise RuntimeError(f"CommitmentGuard strict partial gate expected exit 3, got {partial.returncode}")
+        raise RuntimeError(f"CommitmentGuard strict partial gate expected exit 3, got {partial.returncode}: {partial.stderr}")
     partial_report = json.loads(partial.stdout)
     if partial_report["completion_state"] != "partial" or not partial_report["required_satisfied"]:
         raise RuntimeError("CommitmentGuard partial example did not preserve required-satisfied semantics")
+    if partial_report["summary"]["required_blockers"] != 0:
+        raise RuntimeError("CommitmentGuard partial example unexpectedly has required blockers")
 
     run(
         python,
@@ -69,6 +75,8 @@ def main() -> int:
         "examples/commitmentguard/release-contract.json",
         "--evidence",
         "examples/commitmentguard/release-evidence.json",
+        "--as-of",
+        "2026-09-11T14:01:00Z",
         "--accept-partial",
     )
 
