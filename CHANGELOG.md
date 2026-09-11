@@ -25,10 +25,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Generated non-root Docker runtime user and Python base image derived from the capsule runtime fingerprint.
 - Self-contained export context with verified inputs, manifest, sanitized trace, Dockerfile, `.dockerignore`, devcontainer configuration, and export metadata.
 - CI gate and unit tests for successful export and tampered-capsule blocking.
+- `trustforge reprocapsule benchmark-redaction` for adversarial sanitizer regression testing.
+- Synthetic redaction benchmark covering secret assignments, bearer headers, GitHub/OpenAI-style tokens, AWS access keys, mixed multiline traces, and clean near-miss text.
+- Case-level secret recall and clean specificity metrics with configurable CI thresholds.
+- Machine-readable ReproCapsule redaction benchmark report schema.
 
 ### Changed
 
-- Development version advanced to `0.6.0.dev2`.
+- Development version advanced to `0.6.0.dev3`.
 
 ### Security
 
@@ -37,12 +41,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Replay stdout/stderr are sanitized before being returned.
 - Container export verifies capsule integrity before copying files or generating runtime definitions.
 - Container export never builds or executes the generated container automatically.
+- Redaction regressions now fail CI when the benchmark drops below the configured secret-recall or clean-specificity thresholds.
 - The temporary replay workspace and generated container definitions are not claimed to be complete security sandboxes.
 
 ### Planned
 
 - Sandboxed/containerized replay runner.
-- Adversarial trace-redaction fixtures.
 - Cross-platform dependency/environment lock capture.
 - FreshPlan async refresh adapters, runtime integrations, and persistent metadata state-store adapters.
 - Larger/more varied FreshPlan graph-shape benchmarks and domain-specific freshness-policy linting.
