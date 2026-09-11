@@ -187,7 +187,9 @@ Evidence-backed completion contracts for autonomous agents.
 - [x] Dedicated GitHub Actions evidence adapter with normalized `source.kind: github-actions`
 - [x] GitHub Actions adapter requires runtime metadata but no API token/network call
 - [x] GitHub Actions shared-preflight gate on real Actions runtime metadata
-- [ ] Package-manifest / API-diff evidence adapters
+- [x] Package-manifest exact-snapshot evidence adapter with SHA-256 provenance
+- [x] OpenAPI path+method removal evidence adapter with hash/count-only provenance
+- [x] Package-manifest / API-diff CLI and shared-preflight gates
 - [ ] Signed evidence attestations
 - [ ] Release hardening for `v0.7.0`
 

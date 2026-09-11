@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import tempfile
@@ -8,9 +9,11 @@ from pathlib import Path
 
 from trustforge.commitment_evidence import (
     CommitmentEvidenceError,
+    collect_api_diff,
     collect_command_exit,
     collect_github_actions,
     collect_json_artifact,
+    collect_package_manifest,
     collect_pytest,
     merge_bundles,
 )
@@ -159,6 +162,68 @@ class CommitmentEvidenceTests(unittest.TestCase):
         env = {"GITHUB_ACTIONS": "true", "GITHUB_REPOSITORY": "owner/repo"}
         with self.assertRaises(CommitmentEvidenceError):
             collect_github_actions("ci.passed", "success", environment=env)
+
+    def test_package_manifest_emits_exact_digest_and_manifest_type(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "pyproject.toml"
+            raw = b'[project]\nname = "demo"\n'
+            path.write_bytes(raw)
+            bundle = collect_package_manifest(
+                "dependencies.manifest_sha256",
+                path,
+                observed_at="2026-09-11T15:20:00Z",
+            )
+            observation = bundle["observations"]["dependencies.manifest_sha256"]
+            expected = hashlib.sha256(raw).hexdigest()
+            self.assertEqual(observation["value"], expected)
+            self.assertEqual(observation["source"]["kind"], "package-manifest")
+            self.assertEqual(observation["source"]["manifest_type"], "python-pyproject")
+            self.assertEqual(observation["source"]["sha256"], expected)
+            self.assertEqual(observation["source"]["size_bytes"], len(raw))
+
+    def test_package_manifest_rejects_empty_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "requirements.txt"
+            path.write_bytes(b"")
+            with self.assertRaises(CommitmentEvidenceError):
+                collect_package_manifest("manifest", path)
+
+    def test_api_diff_true_when_operations_only_added(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            before = Path(tmp) / "before.json"
+            after = Path(tmp) / "after.json"
+            before.write_text('{"paths":{"/users":{"get":{}}}}', encoding="utf-8")
+            after.write_text('{"paths":{"/users":{"get":{}},"/health":{"get":{}}}}', encoding="utf-8")
+            bundle = collect_api_diff("api.no_removed_operations", before, after)
+            observation = bundle["observations"]["api.no_removed_operations"]
+            source = observation["source"]
+            self.assertTrue(observation["value"])
+            self.assertEqual(source["kind"], "api-diff")
+            self.assertEqual(source["removed_operation_count"], 0)
+            self.assertEqual(source["added_operation_count"], 1)
+            self.assertFalse(source["operation_names_captured"])
+            self.assertNotIn("/users", json.dumps(bundle))
+            self.assertNotIn("/health", json.dumps(bundle))
+
+    def test_api_diff_false_when_operation_removed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            before = Path(tmp) / "before.json"
+            after = Path(tmp) / "after.json"
+            before.write_text('{"paths":{"/users":{"get":{},"post":{}}}}', encoding="utf-8")
+            after.write_text('{"paths":{"/users":{"get":{}}}}', encoding="utf-8")
+            bundle = collect_api_diff("api.no_removed_operations", before, after)
+            observation = bundle["observations"]["api.no_removed_operations"]
+            self.assertFalse(observation["value"])
+            self.assertEqual(observation["source"]["removed_operation_count"], 1)
+
+    def test_api_diff_rejects_non_openapi_shape(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            before = Path(tmp) / "before.json"
+            after = Path(tmp) / "after.json"
+            before.write_text('{"ok":true}', encoding="utf-8")
+            after.write_text('{"ok":true}', encoding="utf-8")
+            with self.assertRaises(CommitmentEvidenceError):
+                collect_api_diff("api", before, after)
 
     def test_json_artifact_adapter_extracts_value_and_hashes_source(self):
         with tempfile.TemporaryDirectory() as tmp:
