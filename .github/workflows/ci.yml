@@ -41,6 +41,20 @@ jobs:
           assert actual == expected
           print("DataLease smoke test passed")
           PY
+      - name: DataLease interception smoke test
+        run: |
+          python examples/datalease/interceptor_demo.py > .artifacts/datalease-interceptor.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          result = json.loads(Path(".artifacts/datalease-interceptor.json").read_text())
+          assert result["http"]["destination"] == "support.example.com"
+          assert result["mcp"]["destination"] == "mcp:support.create_ticket"
+          assert "internal" not in result["http"]["sent_json"]
+          assert result["http"]["sent_json"] == result["mcp"]["sent_arguments"]
+          print("DataLease interception smoke test passed")
+          PY
 
   action-smoke:
     runs-on: ubuntu-latest

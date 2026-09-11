@@ -16,10 +16,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Value-free decision audit trails.
 - `trustforge datalease apply` CLI with payload-only and separate audit-report modes.
 - DataLease policy schema, examples, unit tests, and CI smoke test.
+- Sync and async HTTP interception adapters that sanitize JSON before transport execution.
+- Sync and async MCP tool-call adapters that sanitize arguments before dispatch.
+- Destination binding for HTTP schemes/hosts/methods and MCP tool patterns.
+- `DataLeaseBlocked` evidence-bearing refusal before unauthorized transports execute.
 
 ### Planned
 
-- DataLease MCP/HTTP interception adapter and pluggable classifier interface.
+- DataLease pluggable classifier interface and policy precision/recall eval suite.
 - JavaScript/TypeScript structured SkillDiff detectors.
 - Transitive dependency capability analysis.
 - Signed capability baselines.

@@ -58,7 +58,9 @@ Purpose-bound minimum-necessary data projection before tool/API/MCP calls.
 - [x] Value-free audit trail explaining every leaf decision
 - [x] CLI with payload-only and separate audit output
 - [x] Policy JSON Schema, examples, unit tests, and CI smoke test
-- [ ] Reference MCP/HTTP interception adapter
+- [x] Reference sync/async HTTP interception adapter
+- [x] Reference sync/async MCP tool-call adapter
+- [x] Destination binding for HTTP scheme/host/method and MCP tool patterns
 - [ ] Pluggable classifier interface
 - [ ] Policy precision/recall benchmark fixtures
 
