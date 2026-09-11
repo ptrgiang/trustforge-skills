@@ -61,8 +61,18 @@ Purpose-bound minimum-necessary data projection before tool/API/MCP calls.
 - [x] Reference sync/async HTTP interception adapter
 - [x] Reference sync/async MCP tool-call adapter
 - [x] Destination binding for HTTP scheme/host/method and MCP tool patterns
-- [ ] Pluggable classifier interface
-- [ ] Policy precision/recall benchmark fixtures
+- [x] Pluggable trusted-classifier interface
+- [x] Classifier provenance (`detector`, `confidence`, `reason`) in value-free audit evidence
+- [x] Classifier failure is fail-closed
+- [x] Synthetic adversarial precision/recall benchmark fixture
+- [x] `trustforge datalease benchmark` CLI and CI regression thresholds
+
+### DataLease release backlog
+
+- [ ] Larger multilingual/domain-specific benchmark datasets
+- [ ] Governance for classifier label namespaces and versioning
+- [ ] Concrete adapters for selected popular MCP/HTTP client stacks
+- [ ] Release `v0.4.0`
 
 ## v0.5 — FreshPlan
 
