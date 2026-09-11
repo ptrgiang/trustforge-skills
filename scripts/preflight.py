@@ -80,6 +80,37 @@ def main() -> int:
         "--accept-partial",
     )
 
+    adversarial = subprocess.run(
+        [
+            python,
+            "-m",
+            "trustforge.cli",
+            "verify",
+            "evals/commitmentguard/adversarial-evidence/contract.json",
+            "--evidence",
+            "evals/commitmentguard/adversarial-evidence/evidence.json",
+            "--as-of",
+            "2026-09-11T14:00:00Z",
+            "--json",
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    if adversarial.returncode != 3:
+        raise RuntimeError(f"CommitmentGuard adversarial gate expected exit 3, got {adversarial.returncode}: {adversarial.stderr}")
+    adversarial_report = json.loads(adversarial.stdout)
+    expected = json.loads((ROOT / "evals/commitmentguard/adversarial-evidence/expected.json").read_text(encoding="utf-8"))
+    if adversarial_report["completion_state"] != expected["completion_state"]:
+        raise RuntimeError("CommitmentGuard adversarial completion state mismatch")
+    if adversarial_report["required_satisfied"] != expected["required_satisfied"]:
+        raise RuntimeError("CommitmentGuard adversarial required-satisfied mismatch")
+    if adversarial_report["summary"] != expected["summary"]:
+        raise RuntimeError("CommitmentGuard adversarial summary mismatch")
+    actual_statuses = {item["id"]: item["status"] for item in adversarial_report["commitments"]}
+    if actual_statuses != expected["statuses"]:
+        raise RuntimeError(f"CommitmentGuard adversarial statuses mismatch: {actual_statuses}")
+
     run(
         python,
         "-m",
