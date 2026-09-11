@@ -7,6 +7,7 @@ TrustForge Skills is an open-source collection of reliability, verification, pri
 The project starts from a simple observation: as agent ecosystems grow, the hard problem is no longer only *what can an agent do?* It is also:
 
 - Did a skill silently gain new capabilities?
+- Did its trigger scope quietly become much broader?
 - Did the agent satisfy every user constraint before claiming completion?
 - Did it expose more data than the task required?
 - Is the plan still valid after external facts changed?
@@ -14,15 +15,98 @@ The project starts from a simple observation: as agent ecosystems grow, the hard
 
 TrustForge turns those questions into reusable skills, contracts, evidence, and evals.
 
-## v0.1 focus
+## Current focus
 
 | Skill | Purpose | Status |
 | --- | --- | --- |
-| **SkillDiff** | Detect capability and behavioral changes between skill versions | 🚧 MVP |
-| **CommitmentGuard** | Require evidence for user constraints before an agent can claim completion | 🚧 MVP |
-| **DataLease** | Minimize and gate data shared with tools/APIs | 🧭 Planned |
-| **FreshPlan** | Invalidate plan nodes when facts become stale | 🧭 Planned |
-| **ReproCapsule** | Package failures into reproducible environments | 🧭 Planned |
+| **SkillDiff** | Detect trust-boundary changes between skill versions | **v0.2 flagship** |
+| **CommitmentGuard** | Require evidence for user constraints before an agent can claim completion | MVP |
+| **DataLease** | Minimize and gate data shared with tools/APIs | Planned |
+| **FreshPlan** | Invalidate plan nodes when facts become stale | Planned |
+| **ReproCapsule** | Package failures into reproducible environments | Planned |
+
+## Why SkillDiff
+
+A normal file diff answers **what text changed**. SkillDiff tries to answer **what trust assumptions changed**.
+
+It currently checks:
+
+```text
+files
+  ↓
+capabilities + evidence locations
+  ↓
+network domains + dependencies
+  ↓
+secret-like environment access
+  ↓
+SKILL.md trigger-scope expansion
+  ↓
+declared vs observed capability manifest
+  ↓
+risk explanations + JSON/SARIF
+```
+
+Example:
+
+```text
+TrustForge SkillDiff
+====================
+Risk: HIGH
+
+Why:
+  - New capabilities detected: environment_read, network, subprocess.
+  - New dependency detected: httpx.
+  - New secret-like environment reference detected: API_TOKEN.
+  - Skill trigger scope appears to have expanded.
+  - Observed capabilities are missing from the declared manifest.
+```
+
+## Quick start
+
+```bash
+git clone https://github.com/ptrgiang/trustforge-skills.git
+cd trustforge-skills
+pip install -e .
+```
+
+Run SkillDiff:
+
+```bash
+trustforge skilldiff ./before-skill ./after-skill
+```
+
+Machine-readable output:
+
+```bash
+trustforge skilldiff ./before-skill ./after-skill --format json
+trustforge skilldiff ./before-skill ./after-skill --format sarif > skilldiff.sarif
+```
+
+Use it as a CI gate:
+
+```bash
+trustforge skilldiff ./before-skill ./after-skill --fail-on medium
+```
+
+Run CommitmentGuard:
+
+```bash
+trustforge verify examples/refactor-contract.json \
+  --evidence examples/refactor-evidence.json
+```
+
+## Capability manifests
+
+A skill can declare expected capabilities in `trustforge.json`:
+
+```json
+{
+  "capabilities": ["network", "filesystem_read"]
+}
+```
+
+SkillDiff compares the declaration with capabilities observed by the static scanner and surfaces mismatches for review.
 
 ## Core idea
 
@@ -38,25 +122,6 @@ Are its assumptions still fresh?
 Did it actually finish the job?
         ↓
 Can we reproduce the failure?
-```
-
-## Quick start
-
-Clone the repository and inspect the first two skills:
-
-```bash
-git clone https://github.com/ptrgiang/trustforge-skills.git
-cd trustforge-skills
-
-cat skills/skilldiff/SKILL.md
-cat skills/commitment-guard/SKILL.md
-```
-
-Once the Python MVP lands, the intended CLI is:
-
-```bash
-trustforge skilldiff ./before-skill ./after-skill
-trustforge verify ./commitments.yaml --evidence ./evidence.json
 ```
 
 ## Design principles
@@ -101,7 +166,7 @@ See [`ROADMAP.md`](ROADMAP.md).
 
 ## Contributing
 
-Contributions are welcome, especially adversarial eval cases, integrations with agent runtimes, and prior-art references. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Contributions are especially welcome for adversarial SkillDiff evals, new language detectors, agent-runtime integrations, and prior-art references. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Security
 

@@ -1,6 +1,6 @@
 ---
 name: skilldiff
-description: Audit two versions of an AI agent skill and surface capability, file, and network-domain changes before the updated skill is trusted or installed.
+description: Audit two versions of an AI agent skill and surface capability, trigger-scope, dependency, secret-access, file, and network-domain changes before the updated skill is trusted or installed.
 license: Apache-2.0
 metadata:
   trustforge:
@@ -11,35 +11,45 @@ metadata:
 
 # SkillDiff
 
-Use SkillDiff when an agent skill, prompt package, MCP helper, or repository automation has changed and you need to know whether the new version silently gained capabilities.
+Use SkillDiff when an agent skill, prompt package, MCP helper, or repository automation has changed and you need to know whether the candidate version crossed a new trust boundary.
 
 ## Goal
 
-Produce a human-readable and machine-readable change report that answers:
+Produce a human-readable or machine-readable change report that answers:
 
 1. Which files were added, removed, or changed?
-2. Which risky capabilities appear in the new version but not the old one?
-3. Which outbound network domains are newly referenced?
-4. What is the resulting risk level?
+2. Which risky capabilities appear in the candidate but not the baseline?
+3. Where exactly was each capability detected?
+4. Did the skill's trigger/selection scope become broader?
+5. Which outbound domains and dependencies are new?
+6. Did the candidate start referencing secret-like environment variables?
+7. Does observed behavior match the declared capability manifest?
+8. What is the resulting review risk?
 
-SkillDiff is intentionally **not** a malware detector and must not claim that a skill is safe merely because no risky patterns were found.
+SkillDiff is intentionally **not** a malware detector. A clean report is not proof that a skill is safe.
 
 ## Inputs
 
 - `before`: directory containing the previously trusted skill version.
 - `after`: directory containing the candidate skill version.
 
+Neither directory is executed by the static scanner.
+
 ## Output
 
-A report containing:
+The v0.2 report includes:
 
 - file delta;
 - added/removed capability classes;
-- source files that triggered capability detection;
+- evidence locations with path, line number, and excerpt;
 - added/removed network domains;
-- heuristic risk score and level.
+- dependency delta;
+- secret-like environment reference delta;
+- trigger-scope lexical expansion estimate;
+- capability-manifest declared-vs-observed comparison;
+- heuristic risk score plus human-readable explanations.
 
-Current MVP capability classes:
+Current capability classes:
 
 - `network`
 - `subprocess`
@@ -49,26 +59,66 @@ Current MVP capability classes:
 - `dynamic_execution`
 - `credential_material`
 
-## Procedure
+## Capability manifest
 
-1. Resolve both directories without executing their contents.
-2. Hash supported text files and calculate the file delta.
-3. Scan text and source files for capability indicators.
-4. Extract explicit HTTP(S) domains.
-5. Compare the old and new capability sets.
-6. Increase risk based only on **new** capabilities/domains.
-7. Return evidence paths so a reviewer can inspect why a capability was flagged.
+A candidate skill may include `trustforge.json`:
+
+```json
+{
+  "capabilities": [
+    "network",
+    "filesystem_read"
+  ]
+}
+```
+
+SkillDiff reports:
+
+- `undeclared_observed`: statically observed capabilities absent from the manifest;
+- `declared_not_observed`: declared capabilities not observed by the current static detector.
+
+The manifest is a review contract, not a sandbox permission system.
+
+A minimal YAML list in `trustforge.yaml` or `trustforge.yml` is also supported.
+
+## Trigger-scope diff
+
+SkillDiff extracts trigger language from `SKILL.md`, prioritizing frontmatter `description` and explicit “use/trigger/invoke ... when/for” lines.
+
+Example:
+
+```text
+Before:
+Use when converting CSV files.
+
+After:
+Use for spreadsheets, reports, analytics, finance, CSV and Excel tasks.
+```
+
+The report identifies newly introduced terms and estimates expansion as `none`, `low`, `medium`, `high`, or `unknown`.
+
+This is deliberately lexical and heuristic. It should flag review-worthy scope expansion, not claim semantic proof.
 
 ## CLI
+
+Human-readable output:
 
 ```bash
 trustforge skilldiff ./skill-v1 ./skill-v2
 ```
 
-Machine-readable output:
+JSON:
 
 ```bash
-trustforge skilldiff ./skill-v1 ./skill-v2 --json
+trustforge skilldiff ./skill-v1 ./skill-v2 --format json
+```
+
+`--json` remains available as a compatibility alias.
+
+SARIF 2.1.0:
+
+```bash
+trustforge skilldiff ./skill-v1 ./skill-v2 --format sarif > skilldiff.sarif
 ```
 
 Fail CI when the candidate introduces medium-or-higher risk:
@@ -79,7 +129,7 @@ trustforge skilldiff ./skill-v1 ./skill-v2 --fail-on medium
 
 Exit codes:
 
-- `0`: report generated and threshold not reached.
+- `0`: report generated and configured threshold not reached.
 - `2`: configured risk threshold reached.
 
 ## Evidence rules
@@ -87,36 +137,49 @@ Exit codes:
 When reporting a capability change:
 
 - identify the capability by name;
-- include the file(s) that triggered it;
+- include path and line number where possible;
 - distinguish a newly added capability from one that already existed;
-- do not infer intent from the pattern alone.
+- do not infer malicious intent from a pattern alone.
 
 Good:
 
-> `subprocess` is newly detected in `scripts/install.py`.
+> `subprocess` is newly detected at `scripts/install.py:42`.
 
 Bad:
 
 > This update is malicious.
 
+## Risk scoring
+
+The v0.2 score increases for newly introduced:
+
+- capabilities, weighted by impact;
+- network domains;
+- dependencies;
+- secret-like environment references;
+- medium/high trigger-scope expansion;
+- observed capabilities omitted from a present capability manifest.
+
+The score is a triage signal, not a security verdict.
+
 ## Failure modes
 
-SkillDiff may miss capabilities implemented through:
+Static SkillDiff may miss capabilities implemented through:
 
 - obfuscation;
 - generated code;
 - binaries;
 - runtime downloads;
 - unusual language APIs;
-- indirect dependencies.
+- transitive dependency behavior;
+- prompt-induced tool use that has no static indicator.
 
-False positives are also possible because pattern detection is heuristic.
+False positives are possible because the detector is intentionally conservative.
 
-## Future work
+## Next work
 
-- AST-based detectors per language;
-- package/dependency capability analysis;
-- behavioral canary replay in a sandbox;
-- trigger-scope diff for `SKILL.md` descriptions;
+- language-aware AST detectors;
+- transitive dependency capability analysis;
+- behavioral canary replay in an isolated sandbox;
 - signed baseline manifests;
-- SARIF output for code scanning UIs.
+- richer trigger-scope models and benchmark datasets.

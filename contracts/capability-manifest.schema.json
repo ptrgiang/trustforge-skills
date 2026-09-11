@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ptrgiang/trustforge-skills/contracts/capability-manifest.schema.json",
+  "title": "TrustForge Capability Manifest",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "capabilities": {
+      "description": "Capabilities the skill author expects the skill to require.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "network",
+          "subprocess",
+          "environment_read",
+          "filesystem_read",
+          "filesystem_write",
+          "dynamic_execution",
+          "credential_material"
+        ]
+      }
+    }
+  },
+  "required": ["capabilities"]
+}
