@@ -24,8 +24,9 @@
     "integrity": {"type": "object"},
     "safety": {
       "type": "object",
-      "required": ["network_disabled", "read_only_rootfs", "capabilities_dropped", "no_new_privileges", "raw_environment_values_injected", "security_sandbox_claimed"],
+      "required": ["build_network_disabled", "network_disabled", "read_only_rootfs", "capabilities_dropped", "no_new_privileges", "raw_environment_values_injected", "security_sandbox_claimed"],
       "properties": {
+        "build_network_disabled": {"const": true},
         "network_disabled": {"const": true},
         "read_only_rootfs": {"const": true},
         "capabilities_dropped": {"const": true},
