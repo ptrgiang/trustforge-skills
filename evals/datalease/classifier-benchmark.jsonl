@@ -1,0 +1,30 @@
+{"id":"email-by-path","path":"user.email","value":"alice@example.com","expected":["pii.email"]}
+{"id":"email-by-value","path":"contact","value":"alice@example.com","expected":["pii.email"]}
+{"id":"phone-by-path","path":"customer.phone","value":"+1 202-555-0187","expected":["pii.phone"]}
+{"id":"phone-by-value","path":"contact","value":"+84 912 345 678","expected":["pii.phone"]}
+{"id":"address-path","path":"shipping.address","value":"12 Example Street","expected":["pii.address"]}
+{"id":"full-name","path":"customer.full_name","value":"Alice Example","expected":["pii.name"]}
+{"id":"dob","path":"profile.date_of_birth","value":"1990-01-01","expected":["pii.dob"]}
+{"id":"passport","path":"identity.passport","value":"P0000001","expected":["pii.government_id"]}
+{"id":"card-number","path":"payment.card_number","value":"4111111111111111","expected":["pii.payment"]}
+{"id":"ip-value","path":"client.ip","value":"192.0.2.10","expected":["network.ip"]}
+{"id":"api-token","path":"auth.api_token","value":"token-value","expected":["secret"]}
+{"id":"client-secret","path":"service.client_secret","value":"secret-value","expected":["secret"]}
+{"id":"password","path":"auth.password","value":"correct-horse","expected":["secret"]}
+{"id":"negative-order-id","path":"order.id","value":"A-100","expected":[]}
+{"id":"negative-sku","path":"items.0.sku","value":"SKU-1","expected":[]}
+{"id":"negative-note","path":"customer_note","value":"call tomorrow","expected":[]}
+{"id":"email-verified-flag","path":"metadata.email_verified","value":true,"expected":[]}
+{"id":"negative-ip-version","path":"request.ip_version","value":"IPv4","expected":[]}
+{"id":"email-in-free-text","path":"note","value":"alice@example.com said hello","expected":["pii.email"]}
+{"id":"secret-in-free-text","path":"note","value":"token=abcd1234","expected":["secret"]}
+{"id":"city-address","path":"billing.city","value":"Hanoi","expected":["pii.address"]}
+{"id":"recipient-name-variant","path":"recipient_name","value":"Alice Example","expected":["pii.name"]}
+{"id":"remote-ip-value","path":"network.remote_addr","value":"203.0.113.5","expected":["network.ip"]}
+{"id":"ssn","path":"pii.ssn","value":"000-00-0000","expected":["pii.government_id"]}
+{"id":"iban","path":"bank.iban","value":"GB00EXAMPLE0000000000","expected":["pii.payment"]}
+{"id":"authorization-header","path":"headers.authorization","value":"Bearer abcdef","expected":["secret"]}
+{"id":"mobile","path":"user.mobile","value":"0912345678","expected":["pii.phone"]}
+{"id":"birth-date","path":"profile.birth_date","value":"1990-01-01","expected":["pii.dob"]}
+{"id":"tax-id","path":"business.tax_id","value":"TAX-0001","expected":["pii.government_id"]}
+{"id":"email-domain-metadata","path":"public.email_domain","value":"example.com","expected":[]}
