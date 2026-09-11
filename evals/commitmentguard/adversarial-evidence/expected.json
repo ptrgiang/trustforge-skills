@@ -1,0 +1,16 @@
+{
+  "completion_state": "not_verified",
+  "required_satisfied": false,
+  "summary": {
+    "pass": 1,
+    "fail": 0,
+    "unknown": 2,
+    "waived": 0,
+    "required_blockers": 1
+  },
+  "statuses": {
+    "fresh-ci": "PASS",
+    "stale-required": "UNKNOWN",
+    "agent-claim-optional": "UNKNOWN"
+  }
+}
