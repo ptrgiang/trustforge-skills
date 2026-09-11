@@ -194,8 +194,8 @@ Evidence-backed completion contracts for autonomous agents.
 - [x] Finalize package/runtime version to `0.7.0`
 - [x] Freeze compatibility and trust-boundary documentation
 - [x] Release hardening for `v0.7.0`
-- [ ] Run final CI/release-candidate matrix
-- [ ] Release `v0.7.0` and advance stable `v0`
+- [x] Run final CI/release-candidate matrix
+- [x] Release `v0.7.0` and advance stable `v0`
 
 ### CommitmentGuard research backlog
 
