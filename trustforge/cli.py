@@ -34,6 +34,12 @@ from .freshplan_refresh import (
     render_patch_text,
     render_requests_text,
 )
+from .reprocapsule import (
+    ReproCapsuleError,
+    build_capsule,
+    dumps as dump_reprocapsule,
+    render_text as render_reprocapsule,
+)
 from .skilldiff_v03 import compare, dumps as dump_skilldiff, dumps_sarif, render_text as render_skilldiff
 
 
@@ -150,6 +156,19 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Exit 6 when the largest generated case exceeds this median runtime",
     )
+
+    reprocapsule = sub.add_parser(
+        "reprocapsule",
+        help="Package a failure into a portable, sanitized reproduction capsule",
+    )
+    reprocapsule_sub = reprocapsule.add_subparsers(dest="reprocapsule_command", required=True)
+    reprocapsule_build = reprocapsule_sub.add_parser(
+        "build",
+        help="Build a reproduction capsule without executing the failing command",
+    )
+    reprocapsule_build.add_argument("--spec", required=True, help="Path to ReproCapsule JSON/YAML build spec")
+    reprocapsule_build.add_argument("--output", required=True, help="Directory to write the capsule")
+    reprocapsule_build.add_argument("--json", action="store_true", dest="as_json")
 
     return parser
 
@@ -275,6 +294,15 @@ def main(argv: list[str] | None = None) -> int:
             and report["largest_case"]["median_ms"] > args.max_median_ms
         ):
             return 6
+        return 0
+
+    if args.command == "reprocapsule" and args.reprocapsule_command == "build":
+        try:
+            report = build_capsule(args.spec, args.output)
+        except (ReproCapsuleError, OSError) as exc:
+            print(f"ReproCapsule error: {exc}", file=sys.stderr)
+            return 7
+        print(dump_reprocapsule(report) if args.as_json else render_reprocapsule(report))
         return 0
 
     return 1
