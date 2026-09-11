@@ -17,54 +17,11 @@ TrustForge does not try to be another agent framework. It sits around agent work
 
 ## The problem
 
-Agents can already:
+Agents can already read and write files, call APIs and tools, use credentials, send structured data to external systems, keep long-running plans alive, and claim that a task is complete.
 
-- read and write files;
-- call APIs and tools;
-- use credentials;
-- send structured data to external systems;
-- keep long-running plans alive;
-- claim that a task is complete.
-
-Those abilities are useful. They also create a new layer of engineering problems.
-
-```text
-Agent changes a skill
-        ↓
-Did its capabilities expand?
-        ↓
-Agent sends data to a tool
-        ↓
-Did it send more than the task required?
-        ↓
-Agent keeps executing a plan
-        ↓
-Is the evidence behind that plan still fresh?
-        ↓
-Agent says "done"
-        ↓
-What evidence proves it?
-```
-
-TrustForge is being built around those questions.
+TrustForge is being built around the trust boundaries those actions create.
 
 ## What is in the repo today
-
-```text
-                       TrustForge
-                           │
-          ┌────────────────┼────────────────┐
-          │                │                │
-      SkillDiff        DataLease        FreshPlan
-          │                │                │
-  capability drift   outbound data    stale evidence
-  trust boundaries   minimization     selective replan
-          │                │                │
-          └────────────────┼────────────────┘
-                           │
-             CommitmentGuard + ReproCapsule
-                  proof + reproducibility
-```
 
 | Primitive | What it does | Status |
 | --- | --- | --- |
@@ -72,24 +29,13 @@ TrustForge is being built around those questions.
 | **DataLease** | Sends only the minimum necessary data to approved destinations | Released |
 | **FreshPlan** | Detects aging evidence and re-plans only affected branches | **v0.5.0** |
 | **CommitmentGuard** | Requires evidence before completion claims | MVP |
-| **ReproCapsule** | Packages failures into portable, sanitized reproduction artifacts | **v0.6 in development** |
+| **ReproCapsule** | Packages failures into portable, sanitized reproduction artifacts and verifies replay | **v0.6 in development** |
 
 ## Who this is for
 
-TrustForge is most useful if you are building:
-
-- autonomous or semi-autonomous agents;
-- coding agents;
-- MCP servers and tool runtimes;
-- long-running agent workflows;
-- internal AI automation that touches real systems;
-- evaluation, safety, reliability, or platform infrastructure around agents.
-
-If your agent can change code, call tools, move data, or act for a long time, these are the kinds of boundaries TrustForge is trying to make explicit.
+TrustForge is most useful if you are building autonomous or semi-autonomous agents, coding agents, MCP servers/tool runtimes, long-running workflows, internal AI automation, or reliability/evaluation infrastructure around agents.
 
 ## Start here
-
-Clone and install:
 
 ```bash
 git clone https://github.com/ptrgiang/trustforge-skills.git
@@ -97,7 +43,7 @@ cd trustforge-skills
 pip install -e .
 ```
 
-### 1. Inspect a skill change
+### Inspect a skill change
 
 ```bash
 trustforge skilldiff \
@@ -106,9 +52,7 @@ trustforge skilldiff \
   --format text
 ```
 
-SkillDiff looks for changes such as new network access, subprocess execution, environment reads, filesystem writes, dynamic execution, dependency changes, and secret-like references.
-
-### 2. Minimize data before a tool call
+### Minimize data before a tool call
 
 ```bash
 trustforge datalease apply \
@@ -118,9 +62,7 @@ trustforge datalease apply \
   --payload-only
 ```
 
-DataLease applies purpose binding, destination binding, allow/redact/deny rules, hard-deny classifiers, and value-free audit evidence.
-
-### 3. Check whether a plan is still based on fresh evidence
+### Check whether a plan is still based on fresh evidence
 
 ```bash
 trustforge freshplan check \
@@ -128,9 +70,9 @@ trustforge freshplan check \
   --as-of "2026-09-11T09:30:00Z"
 ```
 
-FreshPlan models facts as `fresh`, `refresh_due`, or `stale`. Only stale evidence invalidates dependent nodes, so unrelated branches stay valid.
+### Package and verify a failure
 
-### 4. Package a failure without packaging secrets
+Build without executing anything:
 
 ```bash
 trustforge reprocapsule build \
@@ -138,13 +80,25 @@ trustforge reprocapsule build \
   --output .artifacts/reprocapsule
 ```
 
-The v0.6 MVP writes a portable manifest, hashes/copies explicitly listed failing inputs, fingerprints the runtime environment, and sanitizes the supplied failure trace. Raw environment values are not copied, secret-like command arguments are rejected, and the build step does not execute the failing command.
+Verify integrity only:
+
+```bash
+trustforge reprocapsule replay \
+  --capsule .artifacts/reprocapsule
+```
+
+Explicitly execute and verify reproduction:
+
+```bash
+trustforge reprocapsule replay \
+  --capsule .artifacts/reprocapsule \
+  --execute \
+  --fail-on-divergence
+```
 
 ## ReproCapsule v0.6 development
 
-The current development line is focused on a problem that shows up constantly in coding-agent workflows: a failure happened on one machine, but the next developer or agent does not have enough trustworthy context to reproduce it.
-
-Current build flow:
+ReproCapsule now covers both packaging and replay verification:
 
 ```text
 failure context
@@ -155,22 +109,28 @@ path + secret safety checks
       ↓
 input hashes / safe copies
       ↓
-sanitized trace
+sanitized trace + runtime fingerprint
       ↓
-environment fingerprint
+portable capsule
       ↓
-portable reprocapsule.json
+integrity preflight
+      ↓
+explicit --execute gate
+      ↓
+exit-code + failure-signature verification
+      ↓
+ready / reproduced / diverged / blocked
 ```
 
-The MVP deliberately does **not** replay commands yet. Replay verification comes next, after integrity and safety checks are defined clearly.
+Important boundary: the temporary replay workspace is **not a security sandbox**. ReproCapsule reduces accidental environment inheritance and requires explicit execution, but untrusted capsules still need real container/OS isolation.
+
+Next on the v0.6 line: Docker/devcontainer export, stronger isolation, and adversarial redaction fixtures.
 
 See [`skills/reprocapsule/SKILL.md`](skills/reprocapsule/SKILL.md) and [`ROADMAP.md`](ROADMAP.md).
 
 ## FreshPlan v0.5.0
 
-The latest stable release focuses on long-running plans that depend on time-sensitive evidence.
-
-FreshPlan supports provenance and freshness metadata, TTL/validity windows, named freshness policies, selective invalidation, value-free refresh requests, trusted refresh adapters, replacement semantics, minimal plan patches, and deterministic large-graph regression tests.
+The latest stable release focuses on long-running plans that depend on time-sensitive evidence. FreshPlan supports provenance/freshness metadata, TTL/validity windows, named policies, selective invalidation, value-free refresh requests, trusted refresh adapters, replacement semantics, minimal plan patches, and deterministic large-graph regression tests.
 
 Release notes: [`docs/releases/v0.5.0.md`](docs/releases/v0.5.0.md)
 
@@ -191,26 +151,21 @@ For security-sensitive workflows, pin the full release commit SHA instead of the
 
 ## What TrustForge does not claim
 
-This project is intentionally conservative about claims.
-
 - Classifier benchmarks are regression fixtures, not compliance certifications.
 - Performance gates are regression alarms, not production SLAs.
 - Freshness policies cannot prove that a domain-specific TTL is correct.
 - Static capability detection cannot prove runtime behavior.
 - Redaction reduces disclosure but does not automatically make data anonymous.
-- ReproCapsule trace sanitization is a defensive baseline, not a proof that arbitrary secrets can never appear.
+- ReproCapsule sanitization is a defensive baseline, not proof that arbitrary secrets can never appear.
+- ReproCapsule replay is not yet a sandbox.
 
 The goal is useful infrastructure with measurable boundaries, not perfect detection or novelty marketing.
 
 ## Build in public
 
-TrustForge is still pre-1.0 and is being developed in the open.
+TrustForge is still pre-1.0 and is being developed in the open. The repository includes implementation, eval fixtures, known limitations, release checklists, benchmark gates, and design tradeoffs as they evolve.
 
-The repository includes the implementation, eval fixtures, known limitations, release checklists, benchmark gates, and design tradeoffs as they evolve.
-
-The active milestone is **ReproCapsule v0.6**. The first MVP packages failure metadata safely; replay verification and container/devcontainer export are next.
-
-If you are working on agent infrastructure, feedback is useful even if the answer is "this would not fit my stack." Open an issue with a concrete workflow or failure mode.
+The active milestone is **ReproCapsule v0.6**. Safe packaging and integrity-gated replay are now implemented; container/devcontainer export is next.
 
 ## Design principles
 
@@ -237,7 +192,7 @@ If you are working on agent infrastructure, feedback is useful even if the answe
 
 ## Release and compatibility
 
-- Development package version on `main`: **0.6.0.dev0**
+- Development package version on `main`: **0.6.0.dev1**
 - Latest stable release: **v0.5.0**
 - Floating stable GitHub Action ref: **`v0`**
 - License: Apache-2.0
