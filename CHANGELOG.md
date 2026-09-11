@@ -21,21 +21,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Integrity verification before execution, including packaged input and trace hashes/sizes.
 - Temporary replay workspace, bounded timeout, `shell=False`, and reduced environment inheritance.
 - Replay report JSON Schema plus CI gates for reproduction and tamper blocking.
+- `trustforge reprocapsule export-container` for Docker/devcontainer build-context generation.
+- Generated non-root Docker runtime user and Python base image derived from the capsule runtime fingerprint.
+- Self-contained export context with verified inputs, manifest, sanitized trace, Dockerfile, `.dockerignore`, devcontainer configuration, and export metadata.
+- CI gate and unit tests for successful export and tampered-capsule blocking.
 
 ### Changed
 
-- Development version advanced to `0.6.0.dev1`.
+- Development version advanced to `0.6.0.dev2`.
 
 ### Security
 
 - Replay does not execute by default; `--execute` is required explicitly.
 - Tampered or missing packaged inputs block execution before the declared command starts.
 - Replay stdout/stderr are sanitized before being returned.
-- The temporary replay workspace is not claimed to be a security sandbox; untrusted capsules still require real OS/container isolation.
+- Container export verifies capsule integrity before copying files or generating runtime definitions.
+- Container export never builds or executes the generated container automatically.
+- The temporary replay workspace and generated container definitions are not claimed to be complete security sandboxes.
 
 ### Planned
 
-- Docker/devcontainer export.
 - Sandboxed/containerized replay runner.
 - Adversarial trace-redaction fixtures.
 - Cross-platform dependency/environment lock capture.
