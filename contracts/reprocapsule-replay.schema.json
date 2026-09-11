@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ptrgiang/trustforge-skills/contracts/reprocapsule-replay.schema.json",
+  "title": "TrustForge ReproCapsule replay report",
+  "type": "object",
+  "required": ["schema_version", "name", "decision", "executed", "integrity"],
+  "properties": {
+    "schema_version": {"const": "0.1"},
+    "name": {"type": ["string", "null"]},
+    "decision": {"enum": ["ready", "reproduced", "diverged", "blocked"]},
+    "executed": {"type": "boolean"},
+    "reason": {"type": "string"},
+    "return_code": {"type": "integer"},
+    "expected_exit_code": {"type": ["integer", "null"]},
+    "exit_code_match": {"type": "boolean"},
+    "expected_failure_signature": {"type": ["string", "null"]},
+    "failure_signature_match": {"type": "boolean"},
+    "stdout": {"type": "string"},
+    "stderr": {"type": "string"},
+    "output_redactions": {"type": "integer", "minimum": 0},
+    "timed_out": {"type": "boolean"},
+    "timeout_seconds": {"type": "number", "exclusiveMinimum": 0},
+    "integrity": {
+      "type": "object",
+      "required": ["decision", "checks", "summary"],
+      "properties": {
+        "decision": {"enum": ["verified", "blocked"]},
+        "checks": {"type": "array"},
+        "summary": {
+          "type": "object",
+          "required": ["checked", "passed", "failed"],
+          "properties": {
+            "checked": {"type": "integer", "minimum": 0},
+            "passed": {"type": "integer", "minimum": 0},
+            "failed": {"type": "integer", "minimum": 0}
+          }
+        }
+      }
+    }
+  }
+}
