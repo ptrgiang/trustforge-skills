@@ -6,9 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Planned
+
+- ReproCapsule v0.6 portable failure-reproduction primitives.
+- FreshPlan async refresh adapters, runtime integrations, and persistent metadata state-store adapters.
+- Larger/more varied FreshPlan graph-shape benchmarks and domain-specific freshness-policy linting.
+- Larger multilingual/domain-specific DataLease benchmarks.
+- JavaScript/TypeScript structured SkillDiff detectors.
+- Transitive dependency capability analysis.
+
+## [0.5.0] - 2026-09-11
+
 ### Added
 
-- FreshPlan v0.5 MVP for freshness-aware plan dependency graphs.
+- FreshPlan v0.5 freshness-aware plan dependency graphs.
 - Fact provenance plus TTL/absolute validity windows.
 - Selective invalidation from stale facts through dependent plan nodes.
 - Root-cause propagation and dependency-safe `replan_order` output.
@@ -27,19 +38,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Policy-aware replacement handling that can preserve an existing named policy when evidence omits new TTL/absolute-expiry fields.
 - `trustforge freshplan benchmark` deterministic large-graph performance runner with nodes/edges/throughput metrics.
 - 10k-node FreshPlan CI performance regression gate.
+- FreshPlan v0.5.0 release notes and release checklist.
 
 ### Changed
 
 - FreshPlan topological scheduling now uses a heap-backed ready queue for more predictable large-graph behavior.
-- Development package version advanced to `0.5.0.dev2` while stable `v0` remains on `v0.4.0`.
+- Package version advanced to `0.5.0`.
+- `refresh_due` recommends proactive refresh without invalidating dependent nodes; only `stale` evidence invalidates.
 
-### Planned
+### Security
 
-- FreshPlan async refresh adapters, runtime integrations, and persistent metadata state-store adapters.
-- Larger/more varied FreshPlan graph-shape benchmarks and domain-specific freshness-policy linting.
-- Larger multilingual/domain-specific DataLease benchmarks.
-- JavaScript/TypeScript structured SkillDiff detectors.
-- Transitive dependency capability analysis.
+- Freshness reports and refresh requests intentionally omit raw fact values.
+- Future-dated observations fail closed as stale/suspicious freshness evidence.
+- Adapter execution remains explicit trusted application code; the CLI does not dynamically import adapters.
+- Adapter failures, wrong-fact evidence, malformed replacement evidence, graph cycles, and unknown dependencies fail closed.
 
 ## [0.4.0] - 2026-09-11
 
@@ -115,7 +127,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Initial CommitmentGuard evidence verifier.
 - CLI, tests, contracts, examples, CI, security policy, and contributing guide.
 
-[Unreleased]: https://github.com/ptrgiang/trustforge-skills/compare/v0.4.0...main
+[Unreleased]: https://github.com/ptrgiang/trustforge-skills/compare/v0.5.0...main
+[0.5.0]: https://github.com/ptrgiang/trustforge-skills/releases/tag/v0.5.0
 [0.4.0]: https://github.com/ptrgiang/trustforge-skills/releases/tag/v0.4.0
 [0.3.0]: https://github.com/ptrgiang/trustforge-skills/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ptrgiang/trustforge-skills/commits/abfadc6be0c3c4442696d5ed99b47134bd4eea3a
