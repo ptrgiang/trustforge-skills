@@ -44,9 +44,6 @@ def export_container(capsule_dir: str | Path, output_dir: str | Path) -> dict[st
         }
 
     output = Path(output_dir).resolve()
-    if output == capsule or capsule in output.parents:
-        # Exporting beneath the capsule is safe, but clear only the selected export path.
-        pass
     if output.exists():
         if not output.is_dir():
             raise ReproCapsuleError("container export output must be a directory")
@@ -85,7 +82,9 @@ def export_container(capsule_dir: str | Path, output_dir: str | Path) -> dict[st
     )
     (output / "Dockerfile").write_text(dockerfile, encoding="utf-8")
 
-    dockerignore = "\n".join(["*", "!inputs/", "!inputs/**", "!Dockerfile", "!reprocapsule.json", "!trace.txt", ""])
+    dockerignore = "\n".join(
+        ["*", "!inputs/", "!inputs/**", "!Dockerfile", "!reprocapsule.json", "!trace.txt", ""]
+    )
     (output / ".dockerignore").write_text(dockerignore, encoding="utf-8")
 
     devcontainer_dir = output / ".devcontainer"
@@ -101,6 +100,21 @@ def export_container(capsule_dir: str | Path, output_dir: str | Path) -> dict[st
         encoding="utf-8",
     )
 
+    files = [
+        ".dockerignore",
+        ".devcontainer/devcontainer.json",
+        "Dockerfile",
+        "reprocapsule.json",
+        "container-export.json",
+    ]
+    if trace:
+        files.append("trace.txt")
+    files.extend(
+        str(Path(str(item["copied_path"])))
+        for item in manifest.get("inputs", [])
+        if isinstance(item, dict) and item.get("copied_path")
+    )
+
     report = {
         "schema_version": "0.1",
         "name": manifest.get("name"),
@@ -108,12 +122,7 @@ def export_container(capsule_dir: str | Path, output_dir: str | Path) -> dict[st
         "format": "docker-devcontainer",
         "base_image": base_image,
         "workspace": container_workdir,
-        "files": [
-            ".dockerignore",
-            ".devcontainer/devcontainer.json",
-            "Dockerfile",
-            "reprocapsule.json",
-        ],
+        "files": sorted(set(files)),
         "safety": {
             "integrity_verified_before_export": True,
             "raw_environment_values_included": False,
@@ -122,20 +131,29 @@ def export_container(capsule_dir: str | Path, output_dir: str | Path) -> dict[st
             "security_sandbox_claimed": False,
         },
     }
-    if trace:
-        report["files"].append("trace.txt")
-    report["files"].extend(
-        sorted(
-            str(Path(str(item["copied_path"])))
-            for item in manifest.get("inputs", [])
-            if isinstance(item, dict) and item.get("copied_path")
-        )
-    )
-    report["files"] = sorted(set(report["files"]))
     (output / "container-export.json").write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    report["files"].append("container-export.json")
-    report["files"] = sorted(report["files"])
     return report
+
+
+def render_export_text(report: dict[str, Any]) -> str:
+    lines = [
+        f"ReproCapsule container export: {report.get('name')}",
+        f"Decision: {report.get('decision')}",
+    ]
+    if report.get("decision") == "exported":
+        lines.extend(
+            [
+                f"Format: {report.get('format')}",
+                f"Base image: {report.get('base_image')}",
+                f"Workspace: {report.get('workspace')}",
+                f"Files: {len(report.get('files', []))}",
+                "Container built during export: no",
+                "Container executed during export: no",
+            ]
+        )
+    if report.get("reason"):
+        lines.append(f"Reason: {report['reason']}")
+    return "\n".join(lines)
