@@ -123,6 +123,73 @@ class CommitmentEvidenceCliTests(unittest.TestCase):
         self.assertEqual(observation["source"]["run_id"], "99")
         self.assertNotIn("secret-token", output.getvalue())
 
+    def test_package_manifest_cli_calls_collector(self):
+        expected = {
+            "schema_version": "0.2",
+            "observations": {
+                "dependencies.manifest_sha256": {
+                    "value": "abc",
+                    "observed_at": "2026-09-11T15:20:00Z",
+                    "source": {"kind": "package-manifest", "sha256": "abc"},
+                }
+            },
+        }
+        output = io.StringIO()
+        with patch("trustforge.cli.collect_package_manifest", return_value=expected) as collector:
+            with redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "evidence",
+                        "package-manifest",
+                        "--input",
+                        "pyproject.toml",
+                        "--observed-at",
+                        "2026-09-11T15:20:00Z",
+                    ]
+                )
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(output.getvalue()), expected)
+        collector.assert_called_once_with(
+            "dependencies.manifest_sha256",
+            "pyproject.toml",
+            observed_at="2026-09-11T15:20:00Z",
+        )
+
+    def test_api_diff_cli_calls_collector(self):
+        expected = {
+            "schema_version": "0.2",
+            "observations": {
+                "api.no_removed_operations": {
+                    "value": True,
+                    "observed_at": "2026-09-11T15:20:00Z",
+                    "source": {"kind": "api-diff", "removed_operation_count": 0},
+                }
+            },
+        }
+        output = io.StringIO()
+        with patch("trustforge.cli.collect_api_diff", return_value=expected) as collector:
+            with redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "evidence",
+                        "api-diff",
+                        "--before",
+                        "before.json",
+                        "--after",
+                        "after.json",
+                        "--observed-at",
+                        "2026-09-11T15:20:00Z",
+                    ]
+                )
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(output.getvalue()), expected)
+        collector.assert_called_once_with(
+            "api.no_removed_operations",
+            "before.json",
+            "after.json",
+            observed_at="2026-09-11T15:20:00Z",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
