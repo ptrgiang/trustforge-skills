@@ -111,6 +111,63 @@ def main() -> int:
     if actual_statuses != expected["statuses"]:
         raise RuntimeError(f"CommitmentGuard adversarial statuses mismatch: {actual_statuses}")
 
+    command_evidence = subprocess.check_output(
+        [
+            python,
+            "-m",
+            "trustforge.cli",
+            "evidence",
+            "command",
+            "--key",
+            "tests.passed",
+            "--observed-at",
+            "2026-09-11T14:30:00Z",
+            "--",
+            python,
+            "-c",
+            "raise SystemExit(0)",
+        ],
+        cwd=ROOT,
+        text=True,
+    )
+    command_bundle = json.loads(command_evidence)
+    command_observation = command_bundle["observations"]["tests.passed"]
+    if command_observation["value"] is not True:
+        raise RuntimeError("CommitmentGuard command adapter did not map exit 0 to true")
+    if command_observation["source"]["kind"] != "command":
+        raise RuntimeError("CommitmentGuard command adapter source kind mismatch")
+    if command_observation["source"]["stdout_captured"] or command_observation["source"]["stderr_captured"]:
+        raise RuntimeError("CommitmentGuard command adapter unexpectedly captured output")
+
+    with tempfile.TemporaryDirectory() as evidence_tmp:
+        artifact = Path(evidence_tmp) / "coverage.json"
+        artifact.write_text('{"totals":{"percent":94.5}}\n', encoding="utf-8")
+        artifact_evidence = subprocess.check_output(
+            [
+                python,
+                "-m",
+                "trustforge.cli",
+                "evidence",
+                "json-artifact",
+                "--key",
+                "tests.coverage",
+                "--input",
+                str(artifact),
+                "--value-path",
+                "totals.percent",
+                "--observed-at",
+                "2026-09-11T14:30:00Z",
+            ],
+            cwd=ROOT,
+            text=True,
+        )
+        artifact_bundle = json.loads(artifact_evidence)
+        artifact_observation = artifact_bundle["observations"]["tests.coverage"]
+        if artifact_observation["value"] != 94.5:
+            raise RuntimeError("CommitmentGuard artifact adapter extracted the wrong value")
+        if artifact_observation["source"]["kind"] != "artifact" or len(artifact_observation["source"]["sha256"]) != 64:
+            raise RuntimeError("CommitmentGuard artifact adapter provenance mismatch")
+
     run(
         python,
         "-m",
