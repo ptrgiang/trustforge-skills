@@ -128,17 +128,20 @@ Portable failure reproduction for coding agents and autonomous debugging workflo
 - [x] Fail-closed sensitive path and secret-like command checks
 - [x] `trustforge reprocapsule build` CLI
 - [x] Example capsule fixture, unit tests, and CI smoke gate
-- [ ] Replay verification with expected exit code / failure signature
-- [ ] Replay integrity checks before command execution
+- [x] Replay verification with expected exit code / failure signature
+- [x] Replay integrity checks before command execution
+- [x] Explicit `--execute` gate and bounded timeout
+- [x] Temporary replay workspace with `shell=False` and reduced environment inheritance
+- [x] `ready | reproduced | diverged | blocked` replay decision contract
 - [ ] Dockerfile/devcontainer export
 - [ ] Additional trace redaction benchmark/adversarial fixtures
+- [ ] Sandboxed/containerized replay runner
 - [ ] Release hardening for `v0.6.0`
 
 ### ReproCapsule research backlog
 
 - [ ] Cross-platform dependency/environment lock capture
 - [ ] Framework adapters for coding-agent traces
-- [ ] Sandboxed replay runner
 - [ ] Reproduction minimization / input reduction
 - [ ] Signed capsule manifests
 
