@@ -29,6 +29,7 @@ def main() -> int:
     python = sys.executable
 
     run(python, "-m", "unittest", "discover", "-s", "tests", "-v")
+
     run(
         python,
         "-m",
@@ -37,7 +38,78 @@ def main() -> int:
         "examples/refactor-contract.json",
         "--evidence",
         "examples/refactor-evidence.json",
+        "--as-of",
+        "2026-09-11T14:01:00Z",
     )
+
+    partial = subprocess.run(
+        [
+            python,
+            "-m",
+            "trustforge.cli",
+            "verify",
+            "examples/commitmentguard/release-contract.json",
+            "--evidence",
+            "examples/commitmentguard/release-evidence.json",
+            "--as-of",
+            "2026-09-11T14:01:00Z",
+            "--json",
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    if partial.returncode != 3:
+        raise RuntimeError(f"CommitmentGuard strict partial gate expected exit 3, got {partial.returncode}: {partial.stderr}")
+    partial_report = json.loads(partial.stdout)
+    if partial_report["completion_state"] != "partial" or not partial_report["required_satisfied"]:
+        raise RuntimeError("CommitmentGuard partial example did not preserve required-satisfied semantics")
+    if partial_report["summary"]["required_blockers"] != 0:
+        raise RuntimeError("CommitmentGuard partial example unexpectedly has required blockers")
+
+    run(
+        python,
+        "-m",
+        "trustforge.cli",
+        "verify",
+        "examples/commitmentguard/release-contract.json",
+        "--evidence",
+        "examples/commitmentguard/release-evidence.json",
+        "--as-of",
+        "2026-09-11T14:01:00Z",
+        "--accept-partial",
+    )
+
+    adversarial = subprocess.run(
+        [
+            python,
+            "-m",
+            "trustforge.cli",
+            "verify",
+            "evals/commitmentguard/adversarial-evidence/contract.json",
+            "--evidence",
+            "evals/commitmentguard/adversarial-evidence/evidence.json",
+            "--as-of",
+            "2026-09-11T14:00:00Z",
+            "--json",
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    if adversarial.returncode != 3:
+        raise RuntimeError(f"CommitmentGuard adversarial gate expected exit 3, got {adversarial.returncode}: {adversarial.stderr}")
+    adversarial_report = json.loads(adversarial.stdout)
+    expected = json.loads((ROOT / "evals/commitmentguard/adversarial-evidence/expected.json").read_text(encoding="utf-8"))
+    if adversarial_report["completion_state"] != expected["completion_state"]:
+        raise RuntimeError("CommitmentGuard adversarial completion state mismatch")
+    if adversarial_report["required_satisfied"] != expected["required_satisfied"]:
+        raise RuntimeError("CommitmentGuard adversarial required-satisfied mismatch")
+    if adversarial_report["summary"] != expected["summary"]:
+        raise RuntimeError("CommitmentGuard adversarial summary mismatch")
+    actual_statuses = {item["id"]: item["status"] for item in adversarial_report["commitments"]}
+    if actual_statuses != expected["statuses"]:
+        raise RuntimeError(f"CommitmentGuard adversarial statuses mismatch: {actual_statuses}")
 
     run(
         python,

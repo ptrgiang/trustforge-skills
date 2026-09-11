@@ -1,0 +1,36 @@
+{
+  "schema_version": "0.2",
+  "commitments": [
+    {
+      "id": "tests-pass",
+      "description": "The test suite passes using recent command evidence",
+      "evidence": {
+        "key": "tests.passed",
+        "truthy": true,
+        "max_age_seconds": 300,
+        "allowed_source_kinds": ["command", "ci"]
+      }
+    },
+    {
+      "id": "coverage-target",
+      "description": "Coverage is at least 95%",
+      "required": false,
+      "evidence": {
+        "key": "tests.coverage",
+        "gte": 95,
+        "max_age_seconds": 300,
+        "allowed_source_kinds": ["artifact", "ci"]
+      }
+    },
+    {
+      "id": "no-dependency-drift",
+      "description": "No dependencies were added",
+      "evidence": {
+        "key": "dependencies.added",
+        "equals": [],
+        "max_age_seconds": 300,
+        "allowed_source_kinds": ["diff", "ci"]
+      }
+    }
+  ]
+}

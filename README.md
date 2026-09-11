@@ -22,7 +22,7 @@ TrustForge does not try to be another agent framework. It sits around agent work
 | **SkillDiff** | Detects trust-boundary changes between skill versions | Released |
 | **DataLease** | Sends only the minimum necessary data to approved destinations | Released |
 | **FreshPlan** | Detects aging evidence and re-plans only affected branches | **v0.5.0** |
-| **CommitmentGuard** | Requires evidence before completion claims | MVP |
+| **CommitmentGuard** | Requires evidence before completion claims | **v0.7 in development** |
 | **ReproCapsule** | Packages failures, verifies replay, exports/replays container contexts, and gates trace redaction | **v0.6.0** |
 
 ## Who this is for
@@ -63,6 +63,17 @@ trustforge freshplan check \
   --plan examples/freshplan/order-fulfillment.yaml \
   --as-of "2026-09-11T09:30:00Z"
 ```
+
+### Verify whether an agent can claim completion
+
+```bash
+trustforge verify \
+  examples/commitmentguard/release-contract.json \
+  --evidence examples/commitmentguard/release-evidence.json \
+  --as-of "2026-09-11T14:01:00Z"
+```
+
+CommitmentGuard v0.7 distinguishes full completion from partial completion, preserves evidence provenance, can reject stale or future-dated evidence, and can restrict which source kinds are allowed to prove a commitment.
 
 ### Package and verify a failure
 
@@ -105,45 +116,51 @@ trustforge reprocapsule benchmark-redaction \
   --min-clean-specificity 1.0
 ```
 
-The benchmark uses synthetic adversarial traces. `secret_recall` measures how many secret-bearing cases are fully sanitized. `clean_specificity` measures how many clean near-miss cases remain unchanged. Reports identify failed case IDs without echoing synthetic secret values.
+The bundled v0.6.0 redaction fixture is gated at 1.0/1.0. That is a regression baseline for the fixture, not a claim that arbitrary secrets are always detectable.
 
-The bundled v0.6.0 release fixture is gated at 1.0/1.0. That is a regression baseline for the fixture, not a claim that arbitrary secrets are always detectable.
+## CommitmentGuard v0.7 development
+
+The active development line focuses on making agent completion claims explicit and machine-checkable.
+
+```text
+user commitments
+      ↓
+required / optional contract
+      ↓
+evidence observations + provenance
+      ↓
+freshness + source trust policy
+      ↓
+PASS / FAIL / UNKNOWN / WAIVED
+      ↓
+verified_complete / partial / not_verified
+```
+
+New v0.7 capabilities currently include:
+
+- contract, evidence, and report schemas v0.2;
+- per-observation provenance;
+- required vs optional commitments;
+- structured waivers with expiry;
+- deterministic `--as-of` evaluation;
+- evidence `max_age_seconds` freshness policy;
+- `allowed_source_kinds` trust policy;
+- explicit `partial` completion state and `--accept-partial` orchestration policy;
+- fail-closed handling for stale, future-dated, missing, or disallowed evidence;
+- adversarial regression fixtures for stale and self-claimed evidence;
+- backward compatibility with legacy nested evidence documents.
+
+Provenance is metadata, not cryptographic attestation. An allow-listed source can still be dishonest or compromised, so v0.7 does not claim to prove evidence authenticity.
+
+See [`skills/commitment-guard/SKILL.md`](skills/commitment-guard/SKILL.md) and [`ROADMAP.md`](ROADMAP.md).
 
 ## ReproCapsule v0.6.0
 
-```text
-failure context
-      ↓
-explicit build spec
-      ↓
-path + secret safety checks
-      ↓
-input hashes / safe copies
-      ↓
-sanitized trace + runtime fingerprint
-      ↓
-portable capsule
-      ↓
-integrity preflight
-      ↓
-explicit host replay gate
-      ↓
-reproduced / diverged / blocked
-      ↓
-verified Docker/devcontainer export
-      ↓
-explicit container replay gate
-      ↓
-adversarial redaction regression gate
-```
+ReproCapsule packages failure context, verifies integrity, supports host replay, exports Docker/devcontainer contexts, and can replay inside a conservatively restricted Docker runtime.
 
-The generated container context uses a non-root runtime user and derives a Python major/minor base image from the captured runtime fingerprint. Container replay additionally disables runtime networking, uses a read-only root filesystem, drops Linux capabilities, enables no-new-privileges, and sets PID/memory/CPU bounds. Docker build instructions also run with build-network access disabled.
-
-Important boundary: neither host replay nor Docker replay is claimed to be a complete security sandbox. Docker daemon access remains privileged infrastructure, and hostile workloads may require stronger isolation such as dedicated workers, rootless runtimes, seccomp/AppArmor profiles, or microVMs.
+Important boundary: neither host replay nor Docker replay is claimed to be a complete security sandbox. Docker daemon access remains privileged infrastructure, and hostile workloads may require stronger isolation.
 
 Release notes: [`docs/releases/v0.6.0.md`](docs/releases/v0.6.0.md)
-
-See [`skills/reprocapsule/SKILL.md`](skills/reprocapsule/SKILL.md) and [`ROADMAP.md`](ROADMAP.md).
 
 ## FreshPlan v0.5.0
 
@@ -172,6 +189,7 @@ For security-sensitive workflows, pin the full release commit SHA instead of the
 - Performance gates are regression alarms, not production SLAs.
 - Freshness policies cannot prove that a domain-specific TTL is correct.
 - Static capability detection cannot prove runtime behavior.
+- Evidence provenance does not prove that its claimed source is authentic.
 - Redaction reduces disclosure but does not prove arbitrary secrets can never appear.
 - ReproCapsule host/container replay is not a complete security sandbox.
 - Container export does not capture arbitrary OS/native dependency locks.
@@ -182,7 +200,7 @@ The goal is useful infrastructure with measurable boundaries, not perfect detect
 
 TrustForge is still pre-1.0 and is being developed in the open. The repository includes implementation, eval fixtures, known limitations, release checklists, benchmark gates, and design tradeoffs as they evolve.
 
-The latest stable release is **v0.6.0**, centered on ReproCapsule: safe packaging, integrity-gated host replay, Docker/devcontainer export, explicit container replay, and adversarial redaction regression gates.
+The latest stable release is **v0.6.0**. The active development milestone is **CommitmentGuard v0.7**.
 
 ## Design principles
 
@@ -190,8 +208,8 @@ The latest stable release is **v0.6.0**, centered on ReproCapsule: safe packagin
 2. **Least capability.** New powers should be visible.
 3. **Least data.** Tools should receive only what the purpose requires.
 4. **Destination binding.** Minimum data still should not go to the wrong place.
-5. **Freshness is explicit.** Plans should know when their evidence is aging.
-6. **Conservative recovery.** Unknown changes should trigger re-planning.
+5. **Freshness is explicit.** Plans and completion evidence should know when their facts are aging.
+6. **Conservative recovery.** Unknown evidence should not silently become proof.
 7. **Failures should travel.** Reproduction should not depend on the original machine.
 8. **Agent-agnostic by default.** Trust primitives should work across runtimes.
 9. **No unverifiable novelty claims.** Measure the gap instead.
@@ -209,9 +227,9 @@ The latest stable release is **v0.6.0**, centered on ReproCapsule: safe packagin
 
 ## Release and compatibility
 
-- Package version: **0.6.0**
+- Development package version on `main` after this milestone merges: **0.7.0.dev0**
 - Latest stable release: **v0.6.0**
-- Floating stable GitHub Action ref: **`v0`**, currently pinned to the v0.6.0 release commit
+- Floating stable GitHub Action ref: **`v0`**, pinned to the v0.6.0 release commit until the next verified release
 - License: Apache-2.0
 
 ## Contributing

@@ -156,6 +156,38 @@ Portable failure reproduction for coding agents and autonomous debugging workflo
 - [ ] Reproduction minimization / input reduction
 - [ ] Signed capsule manifests
 
+## v0.7 — CommitmentGuard
+
+Evidence-backed completion contracts for autonomous agents.
+
+- [x] Contract schema v0.2 with required/optional commitments
+- [x] Evidence bundle schema v0.2 with per-observation provenance
+- [x] Machine-readable verification report schema v0.2
+- [x] Preserve legacy nested evidence compatibility
+- [x] Structured waivers with explicit reason, approval metadata, and optional expiry
+- [x] `verified_complete | partial | not_verified` completion states
+- [x] `required_satisfied` and required-blocker reporting
+- [x] Strict single-operator validation for evidence rules
+- [x] Deterministic `--as-of` evaluation
+- [x] Evidence freshness policy with `max_age_seconds`
+- [x] Evidence-source trust policy with `allowed_source_kinds`
+- [x] Fail-closed stale and future-dated evidence handling
+- [x] CLI `--accept-partial` orchestration policy
+- [x] Example contract/evidence bundle and unit tests
+- [x] Adversarial eval fixture for stale and self-claimed evidence
+- [x] Shared preflight gates for strict, partial, freshness, and source-trust behavior
+- [ ] Direct evidence adapters for common developer workflows
+- [ ] Signed evidence attestations
+- [ ] Release hardening for `v0.7.0`
+
+### CommitmentGuard research backlog
+
+- [ ] Natural-language commitment extraction
+- [ ] Pytest / GitHub Actions / package-manifest / API-diff adapters
+- [ ] Temporal commitments and deadlines beyond evidence freshness
+- [ ] Hierarchical commitments for multi-agent workflows
+- [ ] Completion-language policy integration
+
 ## v1.0 goal
 
 A stable, agent-agnostic trust layer with reusable contracts, evidence formats, evals, and adapters for major coding/agent runtimes.

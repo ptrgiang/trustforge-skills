@@ -6,8 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- CommitmentGuard contract schema v0.2 with required and optional commitments.
+- CommitmentGuard evidence bundle schema v0.2 with per-observation provenance.
+- CommitmentGuard verification report schema v0.2.
+- `verified_complete`, `partial`, and `not_verified` completion states plus `required_satisfied` reporting.
+- Structured waivers with reason, approval metadata, tickets, and optional expiry.
+- Deterministic CommitmentGuard `--as-of` evaluation.
+- Evidence freshness policy through `max_age_seconds`.
+- Evidence-source trust policy through `allowed_source_kinds`.
+- `trustforge verify --accept-partial` for workflows that explicitly permit optional commitments to remain incomplete.
+- CommitmentGuard adversarial stale/untrusted-evidence fixture and shared preflight gates.
+
+### Changed
+
+- Development package/runtime version advanced to `0.7.0.dev0`.
+- CommitmentGuard preserves legacy nested evidence and string-waiver compatibility while emitting report schema v0.2.
+- Stale, future-dated, expired-waiver, missing-policy metadata, and disallowed-source evidence fail closed to `UNKNOWN`.
+
 ### Planned
 
+- Direct CommitmentGuard evidence adapters for common developer workflows.
+- Signed evidence attestations.
 - Cross-platform dependency/environment lock capture for ReproCapsule.
 - Framework adapters for coding-agent traces.
 - FreshPlan async refresh adapters and runtime integrations.

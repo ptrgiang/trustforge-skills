@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ptrgiang/trustforge-skills/contracts/commitmentguard-report.schema.json",
+  "title": "TrustForge CommitmentGuard verification report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "as_of",
+    "verified_complete",
+    "required_satisfied",
+    "completion_state",
+    "summary",
+    "commitments"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.2"},
+    "as_of": {"type": "string", "minLength": 1},
+    "verified_complete": {"type": "boolean"},
+    "required_satisfied": {"type": "boolean"},
+    "completion_state": {
+      "enum": ["verified_complete", "partial", "not_verified"]
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pass", "fail", "unknown", "waived", "required_blockers"],
+      "properties": {
+        "pass": {"type": "integer", "minimum": 0},
+        "fail": {"type": "integer", "minimum": 0},
+        "unknown": {"type": "integer", "minimum": 0},
+        "waived": {"type": "integer", "minimum": 0},
+        "required_blockers": {"type": "integer", "minimum": 0}
+      }
+    },
+    "commitments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "required", "status", "detail"],
+        "properties": {
+          "id": {"type": "string"},
+          "description": {"type": "string"},
+          "required": {"type": "boolean"},
+          "status": {"enum": ["PASS", "FAIL", "UNKNOWN", "WAIVED"]},
+          "detail": {"type": "string"},
+          "evidence_key": {"type": "string"},
+          "actual": {},
+          "provenance": {"type": "object"},
+          "waiver": {"type": "object"}
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

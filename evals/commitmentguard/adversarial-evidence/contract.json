@@ -1,0 +1,35 @@
+{
+  "schema_version": "0.2",
+  "commitments": [
+    {
+      "id": "fresh-ci",
+      "description": "Fresh CI evidence is accepted",
+      "evidence": {
+        "key": "ci.tests",
+        "truthy": true,
+        "max_age_seconds": 300,
+        "allowed_source_kinds": ["ci"]
+      }
+    },
+    {
+      "id": "stale-required",
+      "description": "Stale required evidence must not prove completion",
+      "evidence": {
+        "key": "security.scan",
+        "truthy": true,
+        "max_age_seconds": 60,
+        "allowed_source_kinds": ["ci"]
+      }
+    },
+    {
+      "id": "agent-claim-optional",
+      "description": "Agent self-claim is not an accepted source",
+      "required": false,
+      "evidence": {
+        "key": "docs.complete",
+        "truthy": true,
+        "allowed_source_kinds": ["ci", "artifact"]
+      }
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ptrgiang/trustforge-skills/contracts/commitmentguard-evidence.schema.json",
+  "title": "TrustForge CommitmentGuard evidence bundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "observations"],
+  "properties": {
+    "schema_version": {"const": "0.2"},
+    "observations": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["value"],
+        "properties": {
+          "value": {},
+          "observed_at": {"type": "string", "minLength": 1},
+          "source": {
+            "type": "object",
+            "additionalProperties": true,
+            "minProperties": 1
+          }
+        }
+      }
+    }
+  }
+}
