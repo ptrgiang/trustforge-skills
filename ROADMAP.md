@@ -133,7 +133,8 @@ Portable failure reproduction for coding agents and autonomous debugging workflo
 - [x] Explicit `--execute` gate and bounded timeout
 - [x] Temporary replay workspace with `shell=False` and reduced environment inheritance
 - [x] `ready | reproduced | diverged | blocked` replay decision contract
-- [ ] Dockerfile/devcontainer export
+- [x] Dockerfile/devcontainer export from verified capsules
+- [x] Non-root generated container user and self-contained export context
 - [ ] Additional trace redaction benchmark/adversarial fixtures
 - [ ] Sandboxed/containerized replay runner
 - [ ] Release hardening for `v0.6.0`
