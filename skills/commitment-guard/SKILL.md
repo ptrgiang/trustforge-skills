@@ -23,10 +23,10 @@ Every commitment resolves to one of:
 
 - `PASS` — evidence exists and satisfies the rule;
 - `FAIL` — evidence contradicts the rule;
-- `UNKNOWN` — required evidence is missing or cannot be evaluated;
-- `WAIVED` — an explicit waiver is recorded in the contract.
+- `UNKNOWN` — required evidence is missing, stale, untrusted, future-dated, or cannot be evaluated;
+- `WAIVED` — an explicit, still-valid waiver is recorded in the contract.
 
-v0.7 also distinguishes required and optional commitments so the overall result can be:
+v0.7 distinguishes required and optional commitments so the overall result can be:
 
 - `verified_complete` — every commitment is `PASS` or `WAIVED`;
 - `partial` — all required commitments are satisfied, but one or more optional commitments are `FAIL` or `UNKNOWN`;
@@ -43,7 +43,9 @@ v0.7 also distinguishes required and optional commitments so the overall result 
       "description": "The test suite passes",
       "evidence": {
         "key": "tests.passed",
-        "truthy": true
+        "truthy": true,
+        "max_age_seconds": 300,
+        "allowed_source_kinds": ["ci", "command"]
       }
     },
     {
@@ -83,6 +85,26 @@ Evidence can carry provenance instead of being only a nested value map:
 
 The verifier preserves this provenance in the commitment result. Legacy nested evidence remains supported.
 
+## Evidence policies
+
+A commitment can constrain the evidence used to prove it:
+
+- `max_age_seconds` requires `observed_at` and rejects stale or future-dated observations;
+- `allowed_source_kinds` requires `source.kind` and rejects sources outside the allow-list.
+
+Example:
+
+```json
+{
+  "key": "security.scan_passed",
+  "truthy": true,
+  "max_age_seconds": 600,
+  "allowed_source_kinds": ["ci", "scanner"]
+}
+```
+
+If evidence violates either policy, CommitmentGuard returns `UNKNOWN` rather than evaluating the value as proof.
+
 ## Supported checks
 
 - `equals`
@@ -104,12 +126,13 @@ v0.7 supports explicit waiver metadata:
   "waiver": {
     "reason": "Accepted for emergency hotfix",
     "approved_by": "release-owner",
-    "ticket": "INC-42"
+    "ticket": "INC-42",
+    "expires_at": "2026-09-12T00:00:00Z"
   }
 }
 ```
 
-Supported waiver metadata is `reason`, `approved_by`, `ticket`, and `expires_at`. A reason is mandatory. Legacy string waivers remain accepted for compatibility.
+Supported waiver metadata is `reason`, `approved_by`, `ticket`, and `expires_at`. A reason is mandatory. Expired waivers resolve to `UNKNOWN`. Legacy string waivers remain accepted for compatibility.
 
 An agent must not invent a waiver to make a completion claim pass.
 
@@ -119,6 +142,14 @@ Strict completion gate:
 
 ```bash
 trustforge verify ./contract.json --evidence ./evidence.json
+```
+
+Deterministic freshness/expiry evaluation:
+
+```bash
+trustforge verify ./contract.json \
+  --evidence ./evidence.json \
+  --as-of "2026-09-11T14:01:00Z"
 ```
 
 Machine-readable output:
@@ -146,11 +177,12 @@ Exit codes:
 2. Give each commitment a stable ID.
 3. Mark acceptance-critical commitments as required.
 4. Define machine-checkable evidence for each commitment.
-5. Gather evidence from tools rather than agent self-assessment where possible.
-6. Attach provenance to observations when available.
-7. Verify the contract.
-8. Do not claim full completion for `partial` or `not_verified`.
-9. Record waivers only when they reflect an explicit authorized decision.
+5. Define freshness/source policy when the evidence can age or comes from multiple trust domains.
+6. Gather evidence from tools rather than agent self-assessment where possible.
+7. Attach provenance to observations when available.
+8. Verify the contract at an explicit evaluation time for deterministic workflows.
+9. Do not claim full completion for `partial` or `not_verified`.
+10. Record waivers only when they reflect an explicit authorized decision.
 
 ## Compatibility
 
@@ -179,8 +211,9 @@ with evidence:
 CommitmentGuard cannot guarantee correctness when:
 
 - the contract omitted an important user requirement;
-- evidence is fabricated or comes from an untrusted source;
+- evidence is fabricated or comes from an untrusted source that is incorrectly allow-listed;
 - provenance identifies a source but does not cryptographically prove it;
+- timestamps are trustworthy in format but not in origin;
 - the evidence key measures a proxy rather than the actual requirement;
 - an optional commitment was incorrectly classified as non-blocking;
 - a natural-language requirement has not been compiled into a reliable check.
@@ -190,6 +223,6 @@ CommitmentGuard cannot guarantee correctness when:
 - evidence signatures / attestations;
 - natural-language commitment extraction;
 - direct adapters for pytest, GitHub Actions, package manifests, API diffs, and browser tasks;
-- temporal commitments and deadlines;
+- temporal commitments and deadlines beyond observation freshness;
 - hierarchical commitments for multi-agent workflows;
 - policy preventing completion language until verification passes.
