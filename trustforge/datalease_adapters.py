@@ -3,10 +3,11 @@ from __future__ import annotations
 import fnmatch
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, Iterable
 from urllib.parse import urlsplit
 
 from .datalease import DataLeaseError, apply_policy, load_policy
+from .datalease_classifiers import FieldClassifier
 
 
 class DataLeaseBlocked(RuntimeError):
@@ -47,9 +48,7 @@ def _bindings(policy: dict[str, Any], kind: str) -> dict[str, Any]:
         )
     binding = destinations.get(kind)
     if not isinstance(binding, dict):
-        raise DataLeaseError(
-            f"Interception policy must declare destinations.{kind}."
-        )
+        raise DataLeaseError(f"Interception policy must declare destinations.{kind}.")
     return binding
 
 
@@ -78,28 +77,24 @@ def _authorize_http_destination(policy: dict[str, Any], method: str, url: str) -
             report=_destination_denial("http-destination", "Invalid absolute HTTP URL."),
             destination=url,
         )
-
     if scheme not in schemes:
         raise DataLeaseBlocked(
             f"HTTP scheme is not authorized by DataLease: {scheme}",
             report=_destination_denial("http-scheme", "HTTP scheme is not authorized."),
             destination=host,
         )
-
     if method_upper not in methods:
         raise DataLeaseBlocked(
             f"HTTP method is not authorized by DataLease: {method_upper}",
             report=_destination_denial("http-method", "HTTP method is not authorized."),
             destination=host,
         )
-
     if not _match_any(host, hosts):
         raise DataLeaseBlocked(
             f"HTTP destination is not authorized by DataLease: {host}",
             report=_destination_denial("http-host", "HTTP host is not authorized."),
             destination=host,
         )
-
     return host
 
 
@@ -108,14 +103,12 @@ def _authorize_mcp_destination(policy: dict[str, Any], tool_name: str) -> str:
     tools = _as_list(binding.get("tools"))
     if not tools:
         raise DataLeaseError("destinations.mcp.tools must contain at least one tool pattern.")
-
     if not _match_any(tool_name, tools):
         raise DataLeaseBlocked(
             f"MCP tool is not authorized by DataLease: {tool_name}",
             report=_destination_denial("mcp-tool", "MCP tool is not authorized."),
             destination=f"mcp:{tool_name}",
         )
-
     return f"mcp:{tool_name}"
 
 
@@ -124,11 +117,12 @@ def _destination_denial(rule_id: str, reason: str) -> dict[str, Any]:
         "path": "$",
         "action": "deny",
         "classifiers": [],
+        "classifier_evidence": [],
         "rule_id": rule_id,
         "reason": reason,
     }]
     return {
-        "schema_version": "0.1",
+        "schema_version": "0.2",
         "decision": "denied",
         "purpose": None,
         "authorized_purposes": [],
@@ -145,8 +139,9 @@ def _project_or_block(
     *,
     destination: str,
     block_empty: bool,
+    classifiers: tuple[FieldClassifier, ...],
 ) -> dict[str, Any]:
-    report = apply_policy(policy, purpose, payload)
+    report = apply_policy(policy, purpose, payload, classifiers=classifiers)
 
     if report["decision"] == "denied":
         raise DataLeaseBlocked(
@@ -154,14 +149,12 @@ def _project_or_block(
             report=report,
             destination=destination,
         )
-
     if block_empty and report.get("output") is None:
         raise DataLeaseBlocked(
             "Outbound transfer has no authorized fields after DataLease projection.",
             report=report,
             destination=destination,
         )
-
     return report
 
 
@@ -174,10 +167,12 @@ class HTTPDataLeaseAdapter:
         transport: Callable[..., Any],
         *,
         block_empty: bool = True,
+        classifiers: Iterable[FieldClassifier] | None = None,
     ) -> None:
         self.policy = policy
         self.transport = transport
         self.block_empty = block_empty
+        self.classifiers = tuple(classifiers or ())
 
     @classmethod
     def from_policy_file(
@@ -186,8 +181,14 @@ class HTTPDataLeaseAdapter:
         transport: Callable[..., Any],
         *,
         block_empty: bool = True,
+        classifiers: Iterable[FieldClassifier] | None = None,
     ) -> "HTTPDataLeaseAdapter":
-        return cls(load_policy(policy_path), transport, block_empty=block_empty)
+        return cls(
+            load_policy(policy_path),
+            transport,
+            block_empty=block_empty,
+            classifiers=classifiers,
+        )
 
     def send_json(
         self,
@@ -206,6 +207,7 @@ class HTTPDataLeaseAdapter:
             json_body,
             destination=destination,
             block_empty=self.block_empty,
+            classifiers=self.classifiers,
         )
         response = self.transport(
             method=method,
@@ -232,10 +234,28 @@ class AsyncHTTPDataLeaseAdapter:
         transport: Callable[..., Awaitable[Any]],
         *,
         block_empty: bool = True,
+        classifiers: Iterable[FieldClassifier] | None = None,
     ) -> None:
         self.policy = policy
         self.transport = transport
         self.block_empty = block_empty
+        self.classifiers = tuple(classifiers or ())
+
+    @classmethod
+    def from_policy_file(
+        cls,
+        policy_path: str | Path,
+        transport: Callable[..., Awaitable[Any]],
+        *,
+        block_empty: bool = True,
+        classifiers: Iterable[FieldClassifier] | None = None,
+    ) -> "AsyncHTTPDataLeaseAdapter":
+        return cls(
+            load_policy(policy_path),
+            transport,
+            block_empty=block_empty,
+            classifiers=classifiers,
+        )
 
     async def send_json(
         self,
@@ -254,6 +274,7 @@ class AsyncHTTPDataLeaseAdapter:
             json_body,
             destination=destination,
             block_empty=self.block_empty,
+            classifiers=self.classifiers,
         )
         response = await self.transport(
             method=method,
@@ -280,10 +301,12 @@ class MCPDataLeaseAdapter:
         caller: Callable[[str, Any], Any],
         *,
         block_empty: bool = True,
+        classifiers: Iterable[FieldClassifier] | None = None,
     ) -> None:
         self.policy = policy
         self.caller = caller
         self.block_empty = block_empty
+        self.classifiers = tuple(classifiers or ())
 
     @classmethod
     def from_policy_file(
@@ -292,8 +315,14 @@ class MCPDataLeaseAdapter:
         caller: Callable[[str, Any], Any],
         *,
         block_empty: bool = True,
+        classifiers: Iterable[FieldClassifier] | None = None,
     ) -> "MCPDataLeaseAdapter":
-        return cls(load_policy(policy_path), caller, block_empty=block_empty)
+        return cls(
+            load_policy(policy_path),
+            caller,
+            block_empty=block_empty,
+            classifiers=classifiers,
+        )
 
     def call_tool(
         self,
@@ -309,6 +338,7 @@ class MCPDataLeaseAdapter:
             arguments,
             destination=destination,
             block_empty=self.block_empty,
+            classifiers=self.classifiers,
         )
         response = self.caller(tool_name, report["output"])
         return InterceptResult(
@@ -329,10 +359,28 @@ class AsyncMCPDataLeaseAdapter:
         caller: Callable[[str, Any], Awaitable[Any]],
         *,
         block_empty: bool = True,
+        classifiers: Iterable[FieldClassifier] | None = None,
     ) -> None:
         self.policy = policy
         self.caller = caller
         self.block_empty = block_empty
+        self.classifiers = tuple(classifiers or ())
+
+    @classmethod
+    def from_policy_file(
+        cls,
+        policy_path: str | Path,
+        caller: Callable[[str, Any], Awaitable[Any]],
+        *,
+        block_empty: bool = True,
+        classifiers: Iterable[FieldClassifier] | None = None,
+    ) -> "AsyncMCPDataLeaseAdapter":
+        return cls(
+            load_policy(policy_path),
+            caller,
+            block_empty=block_empty,
+            classifiers=classifiers,
+        )
 
     async def call_tool(
         self,
@@ -348,6 +396,7 @@ class AsyncMCPDataLeaseAdapter:
             arguments,
             destination=destination,
             block_empty=self.block_empty,
+            classifiers=self.classifiers,
         )
         response = await self.caller(tool_name, report["output"])
         return InterceptResult(
