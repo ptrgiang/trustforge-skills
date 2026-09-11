@@ -23,7 +23,7 @@ TrustForge does not try to be another agent framework. It sits around agent work
 | **DataLease** | Sends only the minimum necessary data to approved destinations | Released |
 | **FreshPlan** | Detects aging evidence and re-plans only affected branches | **v0.5.0** |
 | **CommitmentGuard** | Requires evidence before completion claims | MVP |
-| **ReproCapsule** | Packages failures, verifies replay, exports container contexts, and gates trace redaction | **v0.6 in development** |
+| **ReproCapsule** | Packages failures, verifies replay, exports/replays container contexts, and gates trace redaction | **v0.6.0 release candidate** |
 
 ## Who this is for
 
@@ -64,7 +64,7 @@ trustforge freshplan check \
   --as-of "2026-09-11T09:30:00Z"
 ```
 
-### Package, verify, and export a failure
+### Package and verify a failure
 
 ```bash
 trustforge reprocapsule build \
@@ -79,11 +79,22 @@ trustforge reprocapsule replay \
   --fail-on-divergence
 ```
 
+### Export or replay inside a container boundary
+
 ```bash
 trustforge reprocapsule export-container \
   --capsule .artifacts/reprocapsule \
   --output .artifacts/reprocapsule-container
 ```
+
+```bash
+trustforge reprocapsule replay-container \
+  --capsule .artifacts/reprocapsule \
+  --execute \
+  --fail-on-divergence
+```
+
+Without `--execute`, container replay is an integrity-only preflight and does not invoke Docker.
 
 ### Gate trace redaction
 
@@ -94,9 +105,11 @@ trustforge reprocapsule benchmark-redaction \
   --min-clean-specificity 1.0
 ```
 
-The benchmark uses synthetic adversarial traces. `secret_recall` measures how many secret-bearing cases are fully sanitized. `clean_specificity` measures how many clean near-miss cases remain unchanged. Reports identify failed case IDs without echoing the synthetic secret values.
+The benchmark uses synthetic adversarial traces. `secret_recall` measures how many secret-bearing cases are fully sanitized. `clean_specificity` measures how many clean near-miss cases remain unchanged. Reports identify failed case IDs without echoing synthetic secret values.
 
-## ReproCapsule v0.6 development
+The bundled v0.6.0 release fixture is gated at 1.0/1.0. That is a regression baseline for the fixture, not a claim that arbitrary secrets are always detectable.
+
+## ReproCapsule v0.6.0 release candidate
 
 ```text
 failure context
@@ -113,20 +126,22 @@ portable capsule
       ↓
 integrity preflight
       ↓
-explicit replay gate
+explicit host replay gate
       ↓
 reproduced / diverged / blocked
       ↓
 verified Docker/devcontainer export
       ↓
+explicit container replay gate
+      ↓
 adversarial redaction regression gate
 ```
 
-The generated container context uses a non-root runtime user and derives a Python major/minor base image from the captured runtime fingerprint. It is a portability aid, not a guarantee that all native/system dependencies are reproduced.
+The generated container context uses a non-root runtime user and derives a Python major/minor base image from the captured runtime fingerprint. Container replay additionally disables runtime networking, uses a read-only root filesystem, drops Linux capabilities, enables no-new-privileges, and sets PID/memory/CPU bounds. Docker build instructions also run with build-network access disabled.
 
-Important boundary: neither the temporary replay workspace nor the generated container definition is claimed to be a complete security sandbox. Untrusted capsules still require hardened isolation and an appropriate container/runtime policy.
+Important boundary: neither host replay nor Docker replay is claimed to be a complete security sandbox. Docker daemon access remains privileged infrastructure, and hostile workloads may require stronger isolation such as dedicated workers, rootless runtimes, seccomp/AppArmor profiles, or microVMs.
 
-Next on the v0.6 line: containerized replay isolation and release hardening.
+Release notes: [`docs/releases/v0.6.0.md`](docs/releases/v0.6.0.md)
 
 See [`skills/reprocapsule/SKILL.md`](skills/reprocapsule/SKILL.md) and [`ROADMAP.md`](ROADMAP.md).
 
@@ -158,8 +173,8 @@ For security-sensitive workflows, pin the full release commit SHA instead of the
 - Freshness policies cannot prove that a domain-specific TTL is correct.
 - Static capability detection cannot prove runtime behavior.
 - Redaction reduces disclosure but does not prove arbitrary secrets can never appear.
-- ReproCapsule replay and generated container definitions are not complete security sandboxes.
-- Container export does not yet capture arbitrary OS/native dependency locks.
+- ReproCapsule host/container replay is not a complete security sandbox.
+- Container export does not capture arbitrary OS/native dependency locks.
 
 The goal is useful infrastructure with measurable boundaries, not perfect detection or novelty marketing.
 
@@ -167,7 +182,7 @@ The goal is useful infrastructure with measurable boundaries, not perfect detect
 
 TrustForge is still pre-1.0 and is being developed in the open. The repository includes implementation, eval fixtures, known limitations, release checklists, benchmark gates, and design tradeoffs as they evolve.
 
-The active milestone is **ReproCapsule v0.6**. Safe packaging, integrity-gated replay, container export, and adversarial redaction regression gates are now implemented.
+The active release candidate is **ReproCapsule v0.6.0**. Safe packaging, integrity-gated host replay, Docker/devcontainer export, explicit container replay, and adversarial redaction regression gates are implemented.
 
 ## Design principles
 
@@ -194,9 +209,9 @@ The active milestone is **ReproCapsule v0.6**. Safe packaging, integrity-gated r
 
 ## Release and compatibility
 
-- Development package version on `main`: **0.6.0.dev3**
-- Latest stable release: **v0.5.0**
-- Floating stable GitHub Action ref: **`v0`**
+- Release-candidate package version: **0.6.0**
+- Latest published stable release: **v0.5.0**
+- Floating stable GitHub Action ref: **`v0`**, still pinned to the stable release until v0.6.0 is published and verified
 - License: Apache-2.0
 
 ## Contributing

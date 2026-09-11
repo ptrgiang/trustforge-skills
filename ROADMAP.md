@@ -137,8 +137,17 @@ Portable failure reproduction for coding agents and autonomous debugging workflo
 - [x] Non-root generated container user and self-contained export context
 - [x] Adversarial trace-redaction benchmark with recall/specificity CI gates
 - [x] Machine-readable redaction benchmark report contract
-- [ ] Sandboxed/containerized replay runner
-- [ ] Release hardening for `v0.6.0`
+- [x] Integrity-gated container replay with explicit `--execute`
+- [x] Container build/runtime network disabled
+- [x] Read-only rootfs, tmpfs `/tmp`, capability drop, no-new-privileges, PID/memory/CPU limits
+- [x] Container replay report contract and injected-runner unit tests
+- [x] Fix known quoted-JSON secret redaction miss
+- [x] Fix known plain-English Bearer false positive
+- [x] Freeze bundled release redaction fixture at 1.0 recall / 1.0 specificity
+- [x] Prepare v0.6.0 release notes and checklist
+- [x] Finalize package/runtime version to `0.6.0`
+- [ ] Run final CI/release-candidate matrix
+- [ ] Release `v0.6.0` and advance stable `v0`
 
 ### ReproCapsule research backlog
 

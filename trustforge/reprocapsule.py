@@ -18,13 +18,21 @@ class ReproCapsuleError(ValueError):
     """Raised when a reproduction capsule cannot be built or replayed safely."""
 
 
-SECRET_FIELD_RE = re.compile(
-    r"(?i)(authorization|api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|private[_-]?key)"
+_SECRET_KEY_PATTERN = (
+    r"(?:authorization|api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|private[_-]?key)"
 )
+SECRET_FIELD_RE = re.compile(rf"(?i){_SECRET_KEY_PATTERN}")
 SECRET_ASSIGNMENT_RE = re.compile(
-    r"(?i)\b(authorization|api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|private[_-]?key)\b\s*[:=]\s*([^\s,;]+)"
+    rf"(?i)\b({_SECRET_KEY_PATTERN})\b\s*[:=]\s*([^\s,;]+)"
 )
-BEARER_RE = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+")
+QUOTED_JSON_SECRET_RE = re.compile(
+    rf"(?i)(?P<key_quote>[\"'])(?P<key>{_SECRET_KEY_PATTERN})(?P=key_quote)"
+    rf"\s*:\s*(?P<value_quote>[\"'])(?P<value>[^\"']+)(?P=value_quote)"
+)
+BEARER_RE = re.compile(
+    r"(?i)\bBearer\s+(?P<token>(?=[A-Za-z0-9._~+/=-]{8,}\b)"
+    r"(?=[A-Za-z0-9._~+/=-]*[0-9._~+/=-])[A-Za-z0-9._~+/=-]+)"
+)
 AWS_KEY_RE = re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b")
 GENERIC_TOKEN_RE = re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,})\b")
 SENSITIVE_BASENAMES = {
@@ -153,6 +161,15 @@ def sanitize_trace(text: str) -> tuple[str, int]:
 
     text, count = BEARER_RE.subn("Bearer [REDACTED]", text)
     redactions += count
+
+    def quoted_json_secret(match: re.Match[str]) -> str:
+        nonlocal redactions
+        redactions += 1
+        key_quote = match.group("key_quote")
+        value_quote = match.group("value_quote")
+        return f"{key_quote}{match.group('key')}{key_quote}: {value_quote}[REDACTED]{value_quote}"
+
+    text = QUOTED_JSON_SECRET_RE.sub(quoted_json_secret, text)
 
     def assignment(match: re.Match[str]) -> str:
         nonlocal redactions
