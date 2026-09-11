@@ -1,0 +1,30 @@
+{
+  "schema_version": "0.2",
+  "observations": {
+    "ci.passed": {
+      "value": true,
+      "source": {
+        "kind": "github-actions",
+        "repository": "ptrgiang/trustforge-skills",
+        "workflow": "CI",
+        "job": "test",
+        "run_id": "fixture-1",
+        "run_attempt": "1",
+        "sha": "deadbeef"
+      },
+      "observed_at": "2026-09-11T16:00:00Z",
+      "attestation": {
+        "schema_version": "0.1",
+        "algorithm": "Ed25519",
+        "issuer": "trustforge-ci",
+        "key_id": "fixture-2026-09",
+        "observation_key": "ci.passed",
+        "value_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+        "provenance_sha256": "b645e2e67f29651727b8c6f95d9941b29763634955e9736e2310f1c76d1c723f",
+        "issued_at": "2026-09-11T16:01:00Z",
+        "expires_at": "2026-09-12T16:01:00Z",
+        "signature": "SnKYN-FLmPkbnt-5sAxGUho2NZuG1RuZBHAy952GCH1CWzUb4jgbNckfjbkT0pNhtcIaA4B4nLQosL2eKf2zAQ"
+      }
+    }
+  }
+}
