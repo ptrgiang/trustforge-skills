@@ -184,7 +184,9 @@ Evidence-backed completion contracts for autonomous agents.
 - [x] Dedicated pytest evidence adapter with normalized `source.kind: pytest`
 - [x] Pytest adapter keeps raw pytest args/stdout/stderr out of evidence provenance
 - [x] Pytest adapter CLI/orchestration tests without adding pytest as a runtime dependency
-- [ ] Dedicated GitHub Actions evidence adapter
+- [x] Dedicated GitHub Actions evidence adapter with normalized `source.kind: github-actions`
+- [x] GitHub Actions adapter requires runtime metadata but no API token/network call
+- [x] GitHub Actions shared-preflight gate on real Actions runtime metadata
 - [ ] Package-manifest / API-diff evidence adapters
 - [ ] Signed evidence attestations
 - [ ] Release hardening for `v0.7.0`
