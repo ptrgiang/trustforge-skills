@@ -41,7 +41,7 @@ from .reprocapsule import (
     replay_capsule,
     render_text as render_reprocapsule,
 )
-from .reprocapsule_export import export_container
+from .reprocapsule_export import export_container, render_export_text
 from .skilldiff_v03 import compare, dumps as dump_skilldiff, dumps_sarif, render_text as render_skilldiff
 
 
@@ -277,7 +277,7 @@ def main(argv: list[str] | None = None) -> int:
         except (ReproCapsuleError, OSError) as exc:
             print(f"ReproCapsule container export error: {exc}", file=sys.stderr)
             return 7
-        print(dump_reprocapsule(report) if args.as_json else render_reprocapsule(report))
+        print(dump_reprocapsule(report) if args.as_json else render_export_text(report))
         return 0 if report["decision"] == "exported" else 7
 
     return 1
