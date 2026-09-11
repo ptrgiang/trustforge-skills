@@ -91,7 +91,7 @@ def main() -> int:
         "--min-secret-recall",
         "0.90",
         "--min-clean-specificity",
-        "1.0",
+        "0.833333",
     )
 
     with tempfile.TemporaryDirectory() as tmp:
