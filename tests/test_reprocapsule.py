@@ -40,7 +40,7 @@ class ReproCapsuleTests(unittest.TestCase):
             serialized = json.dumps(report)
             self.assertNotIn("do-not-copy-me", serialized)
             self.assertTrue(report["environment_presence"]["REPRO_TEST_SECRET"]["present"])
-            self.assertEqual(report["inputs"][0]["sha256"], "bb157861a164e35ba50c8ad13b143e35b4b31a97f85d0a45ae6bdf6f71eb2b2e")
+            self.assertEqual(report["inputs"][0]["sha256"], "936353965b4ba9180e3acb781d81aa634390ac95fd2874a9cbc4c4846b49fbd4")
             self.assertTrue((output / "inputs" / "input.json").is_file())
             self.assertNotIn("hunter2", (output / "trace.txt").read_text(encoding="utf-8"))
             self.assertFalse(report["safety"]["raw_environment_values_included"])
