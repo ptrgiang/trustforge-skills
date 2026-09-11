@@ -191,6 +191,119 @@ def collect_github_actions(
     )
 
 
+def _read_bytes(path: str | Path, label: str) -> tuple[Path, bytes]:
+    source = Path(path)
+    try:
+        raw = source.read_bytes()
+    except OSError as exc:
+        raise CommitmentEvidenceError(f"cannot read {label}: {exc}") from exc
+    if not raw:
+        raise CommitmentEvidenceError(f"{label} must not be empty")
+    return source, raw
+
+
+def _manifest_type(path: Path) -> str:
+    name = path.name.lower()
+    if name == "pyproject.toml":
+        return "python-pyproject"
+    if name.startswith("requirements") and path.suffix.lower() in {".txt", ".in"}:
+        return "python-requirements"
+    if name in {"poetry.lock", "uv.lock", "pdm.lock"}:
+        return f"python-{name.split('.')[0]}-lock"
+    if name == "package.json":
+        return "node-package"
+    if name in {"package-lock.json", "npm-shrinkwrap.json"}:
+        return "node-npm-lock"
+    if name == "yarn.lock":
+        return "node-yarn-lock"
+    if name in {"pnpm-lock.yaml", "pnpm-lock.yml"}:
+        return "node-pnpm-lock"
+    return "generic-manifest"
+
+
+def collect_package_manifest(
+    key: str,
+    path: str | Path,
+    *,
+    observed_at: str | None = None,
+) -> dict[str, Any]:
+    source, raw = _read_bytes(path, "package manifest")
+    digest = hashlib.sha256(raw).hexdigest()
+    return _bundle(
+        key,
+        digest,
+        _observed_at(observed_at),
+        {
+            "kind": "package-manifest",
+            "path": str(source),
+            "manifest_type": _manifest_type(source),
+            "sha256": digest,
+            "size_bytes": len(raw),
+        },
+    )
+
+
+_HTTP_METHODS = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
+
+
+def _openapi_operations(document: Any) -> set[tuple[str, str]]:
+    if not isinstance(document, dict) or not isinstance(document.get("paths"), dict):
+        raise CommitmentEvidenceError("API diff input must be an OpenAPI-like JSON object with a paths mapping")
+    operations: set[tuple[str, str]] = set()
+    for path, item in document["paths"].items():
+        if not isinstance(path, str) or not isinstance(item, dict):
+            continue
+        for method in item:
+            normalized = str(method).lower()
+            if normalized in _HTTP_METHODS:
+                operations.add((normalized.upper(), path))
+    return operations
+
+
+def _read_json_document(path: str | Path, label: str) -> tuple[Path, bytes, Any]:
+    source, raw = _read_bytes(path, label)
+    try:
+        document = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise CommitmentEvidenceError(f"{label} must be valid UTF-8 JSON: {exc}") from exc
+    return source, raw, document
+
+
+def collect_api_diff(
+    key: str,
+    before_path: str | Path,
+    after_path: str | Path,
+    *,
+    observed_at: str | None = None,
+) -> dict[str, Any]:
+    before, before_raw, before_document = _read_json_document(before_path, "before API document")
+    after, after_raw, after_document = _read_json_document(after_path, "after API document")
+    before_ops = _openapi_operations(before_document)
+    after_ops = _openapi_operations(after_document)
+    removed = before_ops - after_ops
+    added = after_ops - before_ops
+    return _bundle(
+        key,
+        not removed,
+        _observed_at(observed_at),
+        {
+            "kind": "api-diff",
+            "format": "openapi-path-methods-v1",
+            "before_path": str(before),
+            "after_path": str(after),
+            "before_sha256": hashlib.sha256(before_raw).hexdigest(),
+            "after_sha256": hashlib.sha256(after_raw).hexdigest(),
+            "before_size_bytes": len(before_raw),
+            "after_size_bytes": len(after_raw),
+            "before_operation_count": len(before_ops),
+            "after_operation_count": len(after_ops),
+            "removed_operation_count": len(removed),
+            "added_operation_count": len(added),
+            "operation_names_captured": False,
+        },
+    )
+
+
 def _get_nested(value: Any, dotted_path: str) -> tuple[bool, Any]:
     current = value
     for part in dotted_path.split("."):
