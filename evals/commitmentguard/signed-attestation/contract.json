@@ -1,0 +1,17 @@
+{
+  "schema_version": "0.2",
+  "commitments": [
+    {
+      "id": "ci-pass",
+      "description": "CI evidence must be signed and pass",
+      "evidence": {
+        "key": "ci.passed",
+        "truthy": true,
+        "allowed_source_kinds": ["github-actions"],
+        "require_attestation": true,
+        "allowed_attestation_issuers": ["trustforge-ci"],
+        "allowed_attestation_key_ids": ["fixture-2026-09"]
+      }
+    }
+  ]
+}
