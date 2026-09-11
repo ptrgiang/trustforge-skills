@@ -1,0 +1,24 @@
+{
+  "commitments": [
+    {
+      "id": "C1",
+      "description": "Public API is unchanged",
+      "evidence": {"key": "api.changed", "equals": false}
+    },
+    {
+      "id": "C2",
+      "description": "No dependencies were added",
+      "evidence": {"key": "dependencies.added", "equals": []}
+    },
+    {
+      "id": "C3",
+      "description": "Test coverage is at least 90%",
+      "evidence": {"key": "tests.coverage", "gte": 90}
+    },
+    {
+      "id": "C4",
+      "description": "Python 3.10 remains supported",
+      "evidence": {"key": "compatibility.python310", "truthy": true}
+    }
+  ]
+}

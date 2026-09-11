@@ -1,0 +1,6 @@
+{
+  "api": {"changed": false},
+  "dependencies": {"added": []},
+  "tests": {"coverage": 92.4},
+  "compatibility": {"python310": true}
+}
