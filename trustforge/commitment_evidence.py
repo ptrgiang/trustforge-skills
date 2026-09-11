@@ -39,13 +39,18 @@ def _bundle(key: str, value: Any, observed_at: str, source: dict[str, Any]) -> d
     }
 
 
+def _argv_fingerprint(command: Sequence[str]) -> str:
+    encoded = b"\0".join(part.encode("utf-8") for part in command)
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def collect_command_exit(
     key: str,
     command: Sequence[str],
     *,
     observed_at: str | None = None,
     timeout_seconds: float = 30.0,
-    runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+    runner: Callable[..., subprocess.CompletedProcess[Any]] = subprocess.run,
 ) -> dict[str, Any]:
     if not command or not all(isinstance(part, str) and part for part in command):
         raise CommitmentEvidenceError("command must be a non-empty sequence of strings")
@@ -56,8 +61,8 @@ def collect_command_exit(
         completed = runner(
             list(command),
             shell=False,
-            capture_output=True,
-            text=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             timeout=timeout_seconds,
             check=False,
         )
@@ -70,7 +75,9 @@ def collect_command_exit(
         _observed_at(observed_at),
         {
             "kind": "command",
-            "argv": list(command),
+            "executable": command[0],
+            "argument_count": max(len(command) - 1, 0),
+            "argv_sha256": _argv_fingerprint(command),
             "exit_code": completed.returncode,
             "stdout_captured": False,
             "stderr_captured": False,
