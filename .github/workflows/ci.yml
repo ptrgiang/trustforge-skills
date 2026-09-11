@@ -179,6 +179,24 @@ jobs:
           assert report["largest_case"]["invalidated_nodes"] == 1000
           print("FreshPlan large-graph benchmark gate passed")
           PY
+      - name: ReproCapsule redaction benchmark gate
+        run: |
+          trustforge reprocapsule benchmark-redaction \
+            --dataset evals/reprocapsule/redaction-benchmark.jsonl \
+            --min-secret-recall 1.0 \
+            --min-clean-specificity 1.0 \
+            --json > .artifacts/reprocapsule-redaction-benchmark.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path(".artifacts/reprocapsule-redaction-benchmark.json").read_text())
+          assert report["secret_cases"] >= 10
+          assert report["clean_cases"] >= 5
+          assert report["secret_recall"] == 1.0
+          assert report["clean_specificity"] == 1.0
+          assert report["failed_case_ids"] == []
+          print("ReproCapsule redaction benchmark gate passed")
+          PY
       - name: ReproCapsule build smoke test
         run: |
           rm -rf .artifacts/reprocapsule
@@ -280,7 +298,7 @@ jobs:
           import trustforge
           pyproject = Path("pyproject.toml").read_text()
           version = re.search(r'^version = "([^"]+)"$', pyproject, re.MULTILINE).group(1)
-          assert version == "0.6.0.dev2"
+          assert version == "0.6.0.dev3"
           assert trustforge.__version__ == version
           print(f"development version consistent: {version}")
           PY
